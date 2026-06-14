@@ -57,7 +57,8 @@ def analyse(audio_bytes, filename, mode):
         tmp.write(audio_bytes)
         path = tmp.name
     try:
-        y, _ = librosa.load(path, sr=SR, mono=True)  # full file, no duration cap
+        # Cap at 90 seconds — sufficient for accurate analysis, processes in ~20s on 0.5 CPU
+        y, _ = librosa.load(path, sr=SR, mono=True, duration=90.0)
     finally:
         os.unlink(path)
 
