@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.5.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.5.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,9 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SR = 22050      # Full precision sample rate (8 GB RAM available on Starter plan)
-N_FFT = 2048    # Balanced - good resolution, faster processing
-HOP = 256       # Proportional to N_FFT
+SR = 22050      # Full precision
+N_FFT = 4096    # Full precision FFT - Standard instance (2GB) handles this
+HOP = 512       # Standard hop length
 SF_LOW, SF_HIGH = 2500, 3500
 
 # API key lives on the server only - never sent to browser
@@ -61,8 +61,8 @@ def analyse(audio_bytes, filename, mode):
         import subprocess
         result = subprocess.run(
             ["ffmpeg", "-i", tmp_path, "-ar", str(SR), "-ac", "1",
-             "-t", "90", wav_path, "-y", "-loglevel", "error"],
-            capture_output=True, timeout=60
+             wav_path, "-y", "-loglevel", "error"],
+            capture_output=True, timeout=120
         )
         if result.returncode == 0 and os.path.exists(wav_path):
             load_path = wav_path
@@ -289,7 +289,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.5.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.5.1", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
