@@ -27,7 +27,7 @@ from scipy.ndimage import uniform_filter1d
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.2.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,12 +55,31 @@ def analyse(audio_bytes, filename, mode):
     suffix = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(audio_bytes)
-        path = tmp.name
+        tmp_path = tmp.name
+
+    # Convert to WAV via ffmpeg to avoid MP3 header corruption issues
+    # This ensures librosa receives clean audio regardless of source format
+    wav_path = tmp_path.replace(suffix, ".wav")
     try:
-        # Cap at 90 seconds — sufficient for accurate analysis, processes in ~20s on 0.5 CPU
-        y, _ = librosa.load(path, sr=SR, mono=True, duration=60.0)
+        import subprocess
+        result = subprocess.run(
+            ["ffmpeg", "-i", tmp_path, "-ar", str(SR), "-ac", "1",
+             "-t", "120", wav_path, "-y", "-loglevel", "error"],
+            capture_output=True, timeout=60
+        )
+        if result.returncode != 0 or not os.path.exists(wav_path):
+            # ffmpeg failed — try loading directly
+            load_path = tmp_path
+        else:
+            load_path = wav_path
+        os.unlink(tmp_path)
+
+        y, _ = librosa.load(load_path, sr=SR, mono=True)
     finally:
-        os.unlink(path)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        if os.path.exists(wav_path):
+            os.unlink(wav_path)
 
     dur = len(y) / SR
     fmin = 60 if mode == "speaker" else 80
@@ -273,7 +292,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.2.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.3.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
