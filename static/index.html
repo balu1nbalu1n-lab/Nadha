@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nada &mdash; Voice Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,400;1,500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased}
+:root{
+  --bg:#111210;--bg-s:#181714;--bg-c:#1e1c19;--bg-i:#252118;--bg-h:#2c271e;
+  --brd:#38332a;--brd-m:#48412f;--brd-hi:#c8a96e;
+  --tx:#f0e8d2;--tx-s:#c4b08a;--tx-m:#7a6a52;--tx-a:#e2c97e;
+  --grn:#4ade80;--grn-bg:#081a0e;--grn-b:#123320;
+  --blu:#7dd3fc;--blu-bg:#061520;--blu-b:#0c2d45;
+  --amb:#fcd34d;--amb-bg:#150f00;--amb-b:#2e2000;
+  --red:#fca5a5;--red-bg:#180606;--red-b:#321010;
+  --c-lo:#818cf8;--c-mi:#38bdf8;--c-sf:#c084fc;--c-up:#fb923c;--c-gk:#34d399;--c-pi:#f472b6;
+  --ff:'DM Sans',system-ui,sans-serif;
+  --fs:'Cormorant Garamond',Georgia,serif;
+}
+body{background:var(--bg);color:var(--tx);font-family:var(--ff);font-size:15px;line-height:1.65;min-height:100vh}
+.w{max-width:680px;margin:0 auto;padding:2.5rem 1.25rem 5rem}
+.brand{font-family:var(--fs);font-size:2.6rem;font-weight:500;color:var(--tx-a);font-style:italic;letter-spacing:.02em;line-height:1}
+.brand-tag{font-size:.7rem;font-weight:500;color:var(--tx-m);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+.lead{font-size:.9rem;color:var(--tx-s);margin-top:.5rem}
+.sec{font-size:.65rem;font-weight:600;color:var(--tx-m);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.65rem}
+.card{background:var(--bg-c);border:1px solid var(--brd);border-radius:14px;padding:1.25rem;margin-bottom:.9rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:.6rem 1.1rem;border-radius:10px;font-family:var(--ff);font-size:.875rem;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-p{background:var(--bg-h);color:var(--tx-a);border-color:var(--brd-m)}
+.btn-p:hover:not(:disabled){background:#2f2a1f;border-color:var(--brd-hi)}
+.btn-g{background:transparent;color:var(--tx-m);border-color:var(--brd)}
+.btn-g:hover:not(:disabled){background:var(--bg-h);color:var(--tx-s)}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mbtn{background:var(--bg-i);border:1px solid var(--brd-m);border-radius:14px;padding:1rem 1.1rem;cursor:pointer;text-align:left;transition:all .15s;width:100%}
+.mbtn:hover{background:var(--bg-h)}
+.mbtn.on{background:var(--bg-h);border-color:var(--brd-hi)}
+.mico{font-size:1.5rem;display:block;margin-bottom:6px}
+.mname{font-size:.95rem;font-weight:600;color:var(--tx);display:block;margin-bottom:2px}
+.mbtn.on .mname{color:var(--tx-a)}
+.mdesc{font-size:.72rem;color:var(--tx-m);line-height:1.4}
+.ctx-grid{display:flex;flex-wrap:wrap;gap:8px}
+.cbtn{flex:1 1 calc(50% - 4px);background:var(--bg-i);border:1px solid var(--brd-m);border-radius:10px;padding:.65rem .875rem;cursor:pointer;text-align:left;transition:all .15s}
+.cbtn:hover{background:var(--bg-h)}
+.cbtn.on{background:var(--bg-h);border-color:var(--brd-hi)}
+.cname{font-size:.83rem;font-weight:500;color:var(--tx);display:block;margin-bottom:2px}
+.cbtn.on .cname{color:var(--tx-a)}
+.csub{font-size:.7rem;color:var(--tx-m);line-height:1.3}
+.drop{border:1.5px dashed var(--brd-m);border-radius:14px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;background:var(--bg-s);transition:all .2s}
+.drop:hover,.drop.over{border-color:var(--brd-hi);background:var(--bg-c)}
+.frow{display:flex;align-items:center;gap:12px;background:var(--bg-i);border:1px solid var(--brd-m);border-radius:10px;padding:.875rem}
+.fico{width:40px;height:40px;border-radius:8px;background:var(--bg-h);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;color:var(--tx-a)}
+.bdg{display:inline-flex;align-items:center;font-size:.68rem;font-weight:600;padding:2px 9px;border-radius:99px;letter-spacing:.04em;white-space:nowrap}
+.bs{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-b)}
+.bg{background:var(--blu-bg);color:var(--blu);border:1px solid var(--blu-b)}
+.bd{background:var(--amb-bg);color:var(--amb);border:1px solid var(--amb-b)}
+.bn{background:var(--red-bg);color:var(--red);border:1px solid var(--red-b)}
+.sgrad{height:10px;border-radius:5px;position:relative;overflow:visible;background:linear-gradient(90deg,#0c1b2e 0%,#0b2016 28%,#143520 46%,#0b2016 62%,#281500 80%,#260707 100%)}
+.sideal{position:absolute;left:28%;width:36%;top:0;height:100%;background:rgba(74,222,128,.18);border-radius:5px}
+.scur{position:absolute;top:-5px;width:3px;height:20px;background:var(--tx);border-radius:2px;box-shadow:0 0 8px rgba(240,232,210,.4);transform:translateX(-50%)}
+.sends{display:flex;justify-content:space-between;margin-top:4px;font-size:.68rem;color:var(--tx-m)}
+.sfrow{display:flex;align-items:flex-start;gap:10px;margin-top:8px;padding:8px 12px;background:var(--bg-s);border:1px solid var(--brd);border-radius:8px}
+.sfmini{height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;margin:5px 0}
+.zone{margin-bottom:1.1rem}
+.zhdr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}
+.zname{font-size:.875rem;font-weight:600;color:var(--tx);flex:1;min-width:100px}
+.zfreq{font-size:.68rem;color:var(--tx-m)}
+.btrack{height:7px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;margin:5px 0}
+.bfill{height:100%;border-radius:4px;transition:width .9s cubic-bezier(.4,0,.2,1)}
+.ztip{font-size:.8rem;line-height:1.65;padding-left:10px;margin-top:5px}
+.ztip.ok{color:#a7f3d0;border-left:2px solid var(--grn-b)}
+.ztip.act{color:#fde68a;border-left:2px solid var(--amb-b)}
+.shcard{background:var(--bg-s);border:1px solid var(--brd);border-radius:8px;padding:.6rem .875rem;margin-top:7px}
+.gnote{font-size:.75rem;color:var(--tx-m);margin-top:5px;padding-left:10px;border-left:2px solid var(--brd);font-style:italic;line-height:1.5}
+.dtog{font-size:.68rem;color:var(--tx-m);background:none;border:none;cursor:pointer;padding:0 3px}
+.dbox{display:none;margin-top:6px;padding-left:10px}
+.dbox.open{display:block}
+.dln{font-size:.75rem;color:var(--tx-s);line-height:1.55;margin-bottom:4px}
+.assess{font-family:var(--fs);font-size:1.1rem;line-height:1.95;color:var(--tx-s);font-style:italic}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:1rem}
+.mcell{background:var(--bg-s);border:1px solid var(--brd);border-radius:10px;padding:.625rem .875rem}
+.mlbl{font-size:.65rem;font-weight:500;color:var(--tx-m);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.mval{font-size:.88rem;font-weight:600;color:var(--tx)}
+.msub{font-size:.68rem;color:var(--tx-m);margin-top:2px}
+.rhdr{display:flex;align-items:center;gap:14px;padding:1rem 1.25rem;background:var(--bg-c);border:1px solid var(--brd-m);border-radius:14px;margin-bottom:1rem}
+.rav{width:50px;height:50px;border-radius:50%;background:var(--bg-h);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;border:1px solid var(--brd-m)}
+.notice{font-size:.75rem;background:var(--bg-s);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;margin-top:.75rem;line-height:1.55;color:var(--tx-m)}
+.errbx{font-size:.825rem;color:var(--red);background:var(--red-bg);border:1px solid var(--red-b);border-radius:10px;padding:.6rem .875rem;margin-bottom:.75rem;display:none}
+.wave{display:flex;align-items:center;gap:3px;height:24px}
+.wb{width:3px;border-radius:2px;background:var(--blu);height:3px;transition:height .3s}
+.wb.on{animation:wv .75s ease-in-out infinite alternate}
+.wb:nth-child(1).on{animation-delay:0s}.wb:nth-child(2).on{animation-delay:.09s}
+.wb:nth-child(3).on{animation-delay:.18s}.wb:nth-child(4).on{animation-delay:.27s}
+.wb:nth-child(5).on{animation-delay:.14s}.wb:nth-child(6).on{animation-delay:.23s}
+.wb:nth-child(7).on{animation-delay:.06s}
+@keyframes wv{from{transform:scaleY(.3)}to{transform:scaleY(1)}}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--brd-m);border-top-color:var(--tx-a);border-radius:50%;animation:sp .75s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+hr.div{border:none;border-top:1px solid var(--brd);margin:1rem 0}
+@media(max-width:480px){.mode-grid{grid-template-columns:1fr}.cbtn{flex:1 1 100%}.brand{font-size:2rem}.mgrid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="w">
+
+<header id="g-hdr" style="margin-bottom:2rem">
+  <div class="brand">N&#257;da</div>
+  <div class="brand-tag">Voice Analysis</div>
+  <p class="lead">Upload a voice recording for a precise acoustic assessment and personalised coaching feedback.</p>
+</header>
+
+<section class="card" id="g-mode">
+  <div class="sec">Analysis mode</div>
+  <div class="mode-grid">
+    <button class="mbtn" id="g-msinger">
+      <span class="mico">&#9834;</span>
+      <span class="mname">Singer</span>
+      <span class="mdesc">SF zone &middot; harmonics &middot; gamaka &middot; resonance</span>
+    </button>
+    <button class="mbtn" id="g-mspeaker">
+      <span class="mico">&#9676;</span>
+      <span class="mname">Speaker</span>
+      <span class="mdesc">Clarity &middot; projection &middot; SF zone &middot; prosody</span>
+    </button>
+  </div>
+</section>
+
+<section class="card" id="g-ctx" style="display:none">
+  <div class="sec" id="g-ctxlbl">Raga character</div>
+  <div class="ctx-grid" id="g-ctxbtns"></div>
+</section>
+
+<section id="g-upsec" style="display:none">
+  <div class="drop" id="g-drop">
+    <div style="font-size:2rem;color:var(--tx-m);margin-bottom:.75rem">&#8593;</div>
+    <p style="font-size:1rem;font-weight:500;color:var(--tx);margin-bottom:4px">Upload your recording</p>
+    <p style="font-size:.82rem;color:var(--tx-m);margin-bottom:1rem">WAV &middot; MP3 &middot; M4A &mdash; drag and drop or click</p>
+    <span class="btn btn-g" style="pointer-events:none;font-size:.8rem">Choose file</span>
+    <input type="file" id="g-fi" accept="audio/*" style="display:none">
+  </div>
+  <p class="errbx" id="g-uperr"></p>
+</section>
+
+<section class="card" id="g-ancard" style="display:none">
+  <div class="frow" style="margin-bottom:1rem">
+    <div class="fico">&#9834;</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:.875rem;font-weight:500;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="g-fn">filename.wav</div>
+      <div style="font-size:.72rem;color:var(--tx-m);margin-top:2px" id="g-fm">0 MB</div>
+    </div>
+    <div class="wave">
+      <div class="wb" id="wb1"></div><div class="wb" id="wb2"></div><div class="wb" id="wb3"></div>
+      <div class="wb" id="wb4"></div><div class="wb" id="wb5"></div><div class="wb" id="wb6"></div>
+      <div class="wb" id="wb7"></div>
+    </div>
+  </div>
+  <p class="errbx" id="g-anerr"></p>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-p" id="g-anbtn" style="flex:1">Analyse voice</button>
+    <button class="btn btn-g" id="g-chg">Change</button>
+  </div>
+</section>
+
+<section id="g-res" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+    <div>
+      <span class="brand" style="font-size:1.9rem">N&#257;da</span>
+      <span style="font-size:.65rem;color:var(--tx-m);margin-left:8px;text-transform:uppercase;letter-spacing:.1em">Voice Analysis</span>
+    </div>
+    <button class="btn btn-g" id="g-newbtn" style="font-size:.8rem">&#8635; New analysis</button>
+  </div>
+  <div class="rhdr">
+    <div class="rav" id="g-rav">&#9834;</div>
+    <div>
+      <div style="font-size:1rem;font-weight:600;color:var(--tx)" id="g-rvt">Tenor &middot; Singer</div>
+      <div style="font-size:.78rem;color:var(--tx-m);margin-top:3px" id="g-rct">context &middot; file &middot; 0s</div>
+    </div>
+  </div>
+  <div class="mgrid" id="g-mgrid"></div>
+  <div class="card"><div class="sec">Assessment</div><p class="assess" id="g-assess"></p></div>
+  <div class="card">
+    <div class="sec">Spectral regions of interest</div>
+    <div id="g-slope" style="margin-bottom:1.25rem"></div>
+    <hr class="div">
+    <div id="g-zones"></div>
+    <p style="font-size:.68rem;color:var(--tx-m);text-align:center;margin-top:8px">Tap &#9662; on any zone for directional suggestions</p>
+  </div>
+  <p class="notice" id="g-srcnote"></p>
+  <p style="font-size:.7rem;color:var(--tx-m);text-align:center;margin-top:.75rem;line-height:1.5">
+    N&#257;da Voice Analysis &middot; Acoustic measurements by Python/librosa &middot; Narrative by Claude &middot; Results indicative, intended for vocal development
+  </p>
+</section>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var SINGER_CTX=[
+  {id:'contemplative',label:'Contemplative / meditative',sub:'Bhairav, Todi, Bhairavi, slow alapana'},
+  {id:'balanced',label:'Balanced / devotional',sub:'Kharaharapriya, Yaman, Kalyani'},
+  {id:'bright',label:'Bright / celebratory',sub:'Hamsadhwani, Shankarabharanam, drut'}
+];
+var SPEAKER_CTX=[
+  {id:'formal',label:'Formal / authoritative',sub:'Presentations, leadership, legal'},
+  {id:'conversational',label:'Conversational / warm',sub:'Coaching, teaching, pastoral'},
+  {id:'motivational',label:'High-energy / motivational',sub:'Keynotes, sales, performance'},
+  {id:'broadcast',label:'Professional / broadcast',sub:'Podcast, voiceover, media'}
+];
+
+var SYS='You are Nada, an expert voice analyst with deep knowledge of acoustic science, Carnatic music, voice therapy and communication coaching.\n\nWrite a SINGLE flowing narrative of 3-4 paragraphs. No bullet points, no headers, no raw numbers. Write warmly in second person. 250-320 words.\n\n1. Open with the most distinctive positive quality of this voice\n2. Describe what the voice feels like to a listener\n3. Address the area with most growth potential - frame as invitation not criticism\n4. Close with one specific actionable practice suggestion\n\nACOUSTIC GUIDE:\nOverall slope dB/oct: -14 to -18=very dark; -10 to -14=warm/settled; -6 to -10=ideal balanced; -3 to -6=bright/forward\nSF zone: under 5=developing; 5-10=emerging; 10-15=present; 15-20=strong; over 20=exceptional\nSF zone slope: shallower than overall means SF zone resists rolloff meaning resonance peak forming\nSF Gap: negative means gamaka-driven voice (advanced Carnatic); 0-2=excellent; 2-5=good; over 5=variable\nGamaka semitones: under 1.5=minimal; 1.5-3=moderate; 3-5=expressive; over 5=full Carnatic\nNever say dB values. Translate everything to experiential language.';
+
+var ST={mode:null,ctx:null,file:null,busy:false};
+
+function G(id){return document.getElementById(id);}
+function show(id){var e=G(id);if(e)e.style.display='';}
+function hide(id){var e=G(id);if(e)e.style.display='none';}
+function showE(id,msg){var e=G(id);if(e){e.textContent=msg;e.style.display='block';}}
+function hideE(id){var e=G(id);if(e)e.style.display='none';}
+function setWave(on){for(var i=1;i<=7;i++){var b=G('wb'+i);if(!b)continue;if(on){b.classList.add('on');b.style.height='';}else{b.classList.remove('on');b.style.height='3px';}}}
+function setBtn(txt,dis){var b=G('g-anbtn');if(!b)return;b.innerHTML=dis?'<span class="spin"></span>'+txt:txt;b.disabled=dis;}
+
+// Mode selection
+G('g-msinger').addEventListener('click',function(){selMode('singer');});
+G('g-mspeaker').addEventListener('click',function(){selMode('speaker');});
+
+function selMode(m){
+  ST.mode=m;ST.ctx=null;
+  G('g-msinger').classList.toggle('on',m==='singer');
+  G('g-mspeaker').classList.toggle('on',m==='speaker');
+  G('g-ctxlbl').textContent=m==='singer'?'Raga character':'Speaking context';
+  var cb=G('g-ctxbtns');cb.innerHTML='';
+  (m==='singer'?SINGER_CTX:SPEAKER_CTX).forEach(function(c){
+    var b=document.createElement('button');
+    b.className='cbtn';
+    b.innerHTML='<span class="cname">'+c.label+'</span><span class="csub">'+c.sub+'</span>';
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.cbtn').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');ST.ctx=c.id;show('g-upsec');
+    });
+    cb.appendChild(b);
+  });
+  show('g-ctx');hide('g-upsec');hide('g-ancard');
+}
+
+// File handling
+G('g-drop').addEventListener('click',function(){G('g-fi').click();});
+G('g-drop').addEventListener('dragover',function(e){e.preventDefault();this.classList.add('over');});
+G('g-drop').addEventListener('dragleave',function(){this.classList.remove('over');});
+G('g-drop').addEventListener('drop',function(e){e.preventDefault();this.classList.remove('over');if(e.dataTransfer&&e.dataTransfer.files[0])procFile(e.dataTransfer.files[0]);});
+G('g-fi').addEventListener('change',function(){if(this.files[0])procFile(this.files[0]);});
+G('g-chg').addEventListener('click',function(){ST.file=null;hide('g-ancard');show('g-upsec');hideE('g-anerr');setWave(false);G('g-fi').value='';});
+
+function procFile(f){
+  var ext=f.name.split('.').pop().toLowerCase();
+  if(!['wav','mp3','m4a','ogg','webm','flac','aac','mp4'].includes(ext)&&!f.type.startsWith('audio/')){showE('g-uperr','Please upload an audio file (WAV, MP3, M4A or similar).');return;}
+  hideE('g-uperr');ST.file=f;
+  G('g-fn').textContent=f.name;
+  var ctxL=(ST.mode==='singer'?SINGER_CTX:SPEAKER_CTX).find(function(c){return c.id===ST.ctx;});
+  G('g-fm').textContent=(f.size/1024/1024).toFixed(2)+' MB \u00b7 '+(ST.mode==='singer'?'Singer':'Speaker')+(ctxL?' \u00b7 '+ctxL.label:'');
+  hide('g-upsec');show('g-ancard');setWave(false);setBtn('Analyse voice',false);
+}
+
+// Analysis
+G('g-anbtn').addEventListener('click',runAnalysis);
+G('g-newbtn').addEventListener('click',resetApp);
+
+async function runAnalysis(){
+  if(ST.busy||!ST.file||!ST.mode||!ST.ctx)return;
+  ST.busy=true;setWave(true);setBtn('Analysing\u2026',true);hideE('g-anerr');
+  var metrics,src;
+  try{
+    // Step 1: Acoustic analysis via Python backend
+    try{
+      var fd=new FormData();fd.append('file',ST.file);fd.append('mode',ST.mode);
+      var r=await fetch('/api/analyse',{method:'POST',body:fd});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      var d=await r.json();if(!d.ok)throw new Error('backend error');
+      metrics=d.metrics;src='python';
+    }catch(be){
+      console.warn('Backend unavailable, using browser analysis:',be.message);
+      var ab=await ST.file.arrayBuffer();
+      var ac=new(window.AudioContext||window.webkitAudioContext)();
+      var buf=await ac.decodeAudioData(ab);
+      metrics=browserAnalyse(buf,ST.mode);src='browser';
+    }
+    // Step 2: Narrative via backend proxy (API key stays on server)
+    var ctxL=(ST.mode==='singer'?SINGER_CTX:SPEAKER_CTX).find(function(c){return c.id===ST.ctx;});
+    var nr=await fetch('/api/narrative',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system:SYS,prompt:buildPrompt(metrics,ctxL?ctxL.label:ST.ctx)})
+    });
+    if(!nr.ok){
+      var ne=await nr.json().catch(function(){return{};});
+      throw new Error(ne.detail||'Narrative error '+nr.status);
+    }
+    var nd=await nr.json();
+    showResult(metrics,nd.text||'Assessment unavailable.',src,ctxL);
+  }catch(e){
+    showE('g-anerr',e.message||'Something went wrong. Please try again.');
+    setWave(false);setBtn('Analyse voice',false);
+  }finally{ST.busy=false;}
+}
+
+// Browser fallback analysis (deterministic, no random)
+function browserAnalyse(buf,mode){
+  var sr=buf.sampleRate,ch=buf.getChannelData(0),dur=buf.duration,N=8192;
+  var ss=Math.floor(Math.min(sr*1,(ch.length-N)*0.3));
+  var seg=ch.slice(ss,ss+N);
+  var win=new Float32Array(N);
+  for(var i=0;i<N;i++)win[i]=seg[i]*(0.5-0.5*Math.cos(2*Math.PI*i/(N-1)));
+  var bHz=sr/N;
+  function be(lo,hi){var bL=Math.max(0,Math.floor(lo/bHz)),bH=Math.min(Math.floor(N/2)-1,Math.ceil(hi/bHz)),e=0;for(var b=bL;b<=bH;b++){var re=0,im=0;for(var n=0;n<N;n+=4){var a=-2*Math.PI*b*n/N;re+=win[n]*Math.cos(a);im+=win[n]*Math.sin(a);}e+=re*re+im*im;}return e/Math.max(1,bH-bL+1);}
+  var eL=be(80,500),eMl=be(500,1500),eMh=be(1500,2500),eSF=be(2500,3500),eU=be(3500,8000);
+  var rs=0;for(var i=0;i<seg.length;i++)rs+=seg[i]*seg[i];
+  var rms=Math.sqrt(rs/seg.length),sq=Math.min(1,Math.max(0,(rms-0.005)/0.25));
+  var mL=Math.floor(sr/900),mX=Math.floor(sr/60),al=Math.min(2048,seg.length),bL2=mL,bA=-1;
+  for(var l=mL;l<=Math.min(mX,al-1);l++){var ac=0;for(var i=0;i<al-l;i++)ac+=seg[i]*seg[i+l];if(ac>bA){bA=ac;bL2=l;}}
+  var f0=Math.max(75,Math.min(500,sr/bL2));
+  var vt=f0<100?'Deep Bass':f0<130?'Bass':f0<165?'Baritone':f0<210?'Tenor':f0<265?'Alto':f0<330?'Mezzo-Soprano':'Soprano';
+  var bds=[{fc:200,e:eL},{fc:700,e:eMl},{fc:2000,e:eMh},{fc:3000,e:eSF},{fc:5500,e:eU}];
+  var lx=bds.map(function(b){return Math.log2(b.fc);}),ly=bds.map(function(b){return 10*Math.log10(b.e+1e-10);});
+  var mx=lx.reduce(function(a,b){return a+b;},0)/5,my=ly.reduce(function(a,b){return a+b;},0)/5,nu=0,de=0;
+  for(var i=0;i<5;i++){nu+=(lx[i]-mx)*(ly[i]-my);de+=(lx[i]-mx)*(lx[i]-mx);}
+  var slope=Math.max(-18,Math.min(-2,de>0?nu/de:-8));
+  var eA=be(2000,2500),eB=be(2500,3000),eC=be(3000,3500),eD=be(3500,4000);
+  var sfB=[{fc:2200,e:eA},{fc:2750,e:eB},{fc:3250,e:eC},{fc:3750,e:eD}];
+  var slx=sfB.map(function(b){return Math.log2(b.fc+1);}),sly=sfB.map(function(b){return 10*Math.log10(b.e+1e-10);});
+  var smx=slx.reduce(function(a,b){return a+b;},0)/4,smy=sly.reduce(function(a,b){return a+b;},0)/4,snu=0,sde=0;
+  for(var i=0;i<4;i++){snu+=(slx[i]-smx)*(sly[i]-smy);sde+=(slx[i]-smx)*(slx[i]-smx);}
+  var sfSl=Math.max(-20,Math.min(0,sde>0?snu/sde:slope));
+  var sfDev=parseFloat((slope-sfSl).toFixed(2));
+  var sfShape,sfCode;
+  if(sfDev>3.5){sfShape='Sharp concentrated peak';sfCode='sharp';}
+  else if(sfDev>1.2){sfShape='Moderate focused peak';sfCode='moderate';}
+  else if(sfDev>-0.5){sfShape='Broad plateau';sfCode='plateau';}
+  else{sfShape='Below trend';sfCode='below';}
+  var pSF=my+(slope/1)*(Math.log2(3000)-mx),aSF=10*Math.log10(eSF+1e-10),sfS=Math.max(0,aSF-pSF+8+sq*6);
+  var half=Math.floor(ch.length/2),s2=ch.slice(half,Math.min(half+N,ch.length)),sfE2=0;
+  var sfBL=Math.floor(2500/bHz),sfBH=Math.ceil(3500/bHz);
+  for(var b=sfBL;b<=Math.min(sfBH,Math.floor(N/2)-1);b++){var re=0,im=0;for(var n=0;n<Math.min(N,s2.length);n+=8){var a=-2*Math.PI*b*n/N;re+=(s2[n]||0)*Math.cos(a);im+=(s2[n]||0)*Math.sin(a);}sfE2+=re*re+im*im;}
+  var sfR=Math.log10(sfE2/(eSF*N/8)+0.01),sfGap=parseFloat((-(sfR*3)).toFixed(1)),sfL=sfS-sfGap;
+  var acZ=0;for(var i=0;i<al;i++)acZ+=seg[i]*seg[i];
+  var hR=acZ>0?Math.max(0.001,Math.min(0.9999,bA/acZ)):0.5,hnr=10*Math.log10(hR/(1-hR+0.001));
+  var nH=Math.min(80,Math.floor((8000/f0)*sq*0.8+10));
+  var eH1=be(f0*.85,f0*1.15),eH2=be(f0*1.85,f0*2.15),eH3=be(f0*2.85,f0*3.15),eH4=be(f0*3.85,f0*4.15);
+  var ha=[eH1,eH2,eH3,eH4],dH=ha.indexOf(Math.max.apply(null,ha))+1;
+  var stp=Math.floor(ch.length/12),f0s=[];
+  for(var s=1;s<=10;s++){var off=s*stp;if(off+al>ch.length)break;var sg2=ch.slice(off,off+al),bA2=-1,bL3=mL;for(var l=mL;l<=Math.min(mX,al-1);l+=2){var ac2=0;for(var i=0;i<al-l;i+=4)ac2+=sg2[i]*sg2[i+l];if(ac2>bA2){bA2=ac2;bL3=l;}}var fS=sr/bL3;if(fS>60&&fS<900)f0s.push(fS);}
+  var pIqr=30,gk=1.5,gkR=3.0;
+  if(f0s.length>3){f0s.sort(function(a,b){return a-b;});var q1=f0s[Math.floor(f0s.length*.25)],q3=f0s[Math.floor(f0s.length*.75)];pIqr=q3-q1;if(mode==='singer'){var mf=f0s[Math.floor(f0s.length/2)],ext=mf>0?12*Math.log2((mf+pIqr/2)/Math.max(1,mf-pIqr/2)):1.5;gk=Math.max(0.5,Math.min(7,ext));gkR=3+sq*2;}}
+  function tD(e){return Math.max(-40,10*Math.log10(e+1e-10));}
+  var rD=tD(eMl);
+  return{mode:mode,duration:dur.toFixed(1),f0:f0.toFixed(1),vtype:vt,slope:slope.toFixed(2),
+    sf_str:sfS.toFixed(1),sf_ltas:sfL.toFixed(1),sf_gap:sfGap,sf_shape:sfShape,sf_shape_code:sfCode,
+    sf_slope_local:sfSl.toFixed(2),sf_slope_deviation:sfDev,dominant_H:dH,n_harmonics:nH,
+    hnr:hnr.toFixed(1),gamaka:gk.toFixed(1),gamaka_rate:gkR.toFixed(1),pitch_iqr:pIqr.toFixed(0),
+    low_max:(tD(eL)-rD+5).toFixed(1),mid_max:(tD(eMh)-rD+12).toFixed(1),
+    sf_max:Math.max(0,sfS*.9).toFixed(1),upper_max:(tD(eU)-rD-2).toFixed(1)};
+}
+
+function buildPrompt(m,ctx){
+  var sfG=parseFloat(m.sf_gap||0),sl=parseFloat(m.slope),sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0),sf=parseFloat(m.sf_str||0),gk=parseFloat(m.gamaka||0);
+  var sfGd=sfG<0?'negative, gamaka-driven (advanced Carnatic)':sfG<2?'excellent':sfG<5?'good':'moderate variation';
+  var sD=sl<-13?'very dark':sl<-10?'warm/settled':sl<-6?'ideal balanced':sl<-3?'bright/forward':'very bright';
+  var sfSlD=sfDev>2?'shallower than overall, resonance peak forming':sfDev>0.5?'moderately shallower, moderate peak':'following overall rolloff, broad activation';
+  var sfD=sf>=20?'exceptional':sf>=15?'strong':sf>=10?'present':'developing';
+  var gkD=gk>=5?'full Carnatic width':gk>=3?'wide expressive':gk>=1.5?'moderate':'minimal';
+  var L=['Voice for a '+(m.mode==='singer'?'singer':'speaker')+'. Context: '+(ctx||''),'',
+    'F0: '+m.f0+' Hz ('+m.vtype+'). Duration: '+m.duration+'s. Dominant H'+(m.dominant_H||1),
+    'Overall slope: '+m.slope+' dB/oct ('+sD+')',
+    'SF zone slope 2000-4000 Hz: '+sfSl+' dB/oct ('+sfSlD+')',
+    'SF zone deviation: '+sfDev+' dB',
+    'SF zone: '+sf+' dB above rolloff ('+sfD+')',
+    'SF LTAS: '+m.sf_ltas+'. SF Gap: '+sfGd,
+    'SF shape: '+m.sf_shape,'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics];
+  if(m.mode==='singer')L.push('Gamaka: '+m.gamaka+' st ('+gkD+'). Rate: '+m.gamaka_rate+' Hz');
+  else L.push('Pitch IQR: '+m.pitch_iqr+' Hz');
+  L.push('','Please provide the qualitative narrative assessment.');
+  return L.join('\n');
+}
+
+function showResult(m,assess,src,ctxL){
+  setWave(false);
+  ['g-hdr','g-mode','g-ctx','g-upsec','g-ancard'].forEach(hide);
+  G('g-rav').textContent=m.mode==='singer'?'\u266a':'\u25ce';
+  G('g-rvt').textContent=(m.vtype||'')+' \u00b7 '+(m.mode==='singer'?'Singer':'Speaker');
+  G('g-rct').textContent=(ctxL?ctxL.label:'')+' \u00b7 '+(ST.file?ST.file.name:'')+' \u00b7 '+m.duration+'s';
+  G('g-assess').textContent=assess;
+  G('g-mgrid').innerHTML=buildGrid(m);
+  G('g-slope').innerHTML=renderSlope(m);
+  G('g-zones').innerHTML=renderZones(m);
+  var n=G('g-srcnote');
+  n.textContent=src==='python'?'\u2713 Precision analysis via Python/librosa pipeline.':'\u26a0 Browser-side analysis (backend unavailable). Metrics are consistent but approximate.';
+  show('g-res');
+}
+
+function buildGrid(m){
+  var sl=parseFloat(m.slope),sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0),sfGap=parseFloat(m.sf_gap||0),sf=parseFloat(m.sf_str||0);
+  function slL(v){return v<-13?'Dark':v<-10?'Warm dark':v<-6?'Ideal':v<-3?'Bright':'Very bright';}
+  var cells=[
+    {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
+    {l:'Overall slope',v:slL(sl),s:m.slope+' dB/oct'},
+    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:'+'+sf+' dB'},
+    {l:'SF zone slope',v:sfDev>2?'Peak forming':sfDev>0.5?'Moderate peak':'Broad/flat',s:sfSl+' dB/oct'},
+    {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
+    {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
+  ];
+  if(m.mode==='singer')cells.push({l:'Gamaka',v:parseFloat(m.gamaka)>=5?'Wide Carnatic':parseFloat(m.gamaka)>=3?'Expressive':parseFloat(m.gamaka)>=1.5?'Moderate':'Minimal',s:m.gamaka+' st, '+m.gamaka_rate+' Hz'});
+  else cells.push({l:'Pitch range',v:parseFloat(m.pitch_iqr||30)>=80?'Wide':parseFloat(m.pitch_iqr||30)>=40?'Moderate':'Contained',s:'IQR '+m.pitch_iqr+' Hz'});
+  cells.push({l:'H dominant',v:'H'+(m.dominant_H||1),s:m.n_harmonics+' harmonics'});
+  return cells.map(function(c){return '<div class="mcell"><div class="mlbl">'+c.l+'</div><div class="mval">'+c.v+'</div>'+(c.s?'<div class="msub">'+c.s+'</div>':'')+'</div>';}).join('');
+}
+
+function sPos(v){return v<-13?18:v<-10?34:v<-6?52:v<-3?70:86;}
+function sLbl(v){return v<-13?'Warm & dark':v<-10?'Warm & settled':v<-6?'Ideal balanced':v<-3?'Bright & forward':'Very bright';}
+function sTier(v){return(v>=-10&&v<=-6)?'bs':v>-12?'bg':'bd';}
+
+function renderSlope(m){
+  var sl=parseFloat(m.slope),pos=sPos(sl),lbl=sLbl(sl),tier=sTier(sl);
+  var sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0);
+  var isIdeal=sl>=-10&&sl<=-6;
+  var sfCode=m.sf_shape_code||'plateau';
+  var sfPct=sfCode==='sharp'?92:sfCode==='moderate'?62:sfCode==='plateau'?35:15;
+  var sfCol=sfCode==='sharp'?'var(--grn)':sfCode==='moderate'?'var(--blu)':'var(--amb)';
+  var sfDB=sfDev>2?'bs':sfDev>0.5?'bg':'bd';
+  return '<div style="margin-bottom:1.25rem">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><span style="font-size:.875rem;font-weight:600;color:var(--tx)">Spectral slope (overall)</span><span class="bdg '+tier+'">'+lbl+'</span></div>'
+    +'<div class="sgrad">'+(isIdeal?'<div class="sideal"></div>':'')+'<div class="scur" style="left:'+pos+'%"></div></div>'
+    +'<div class="sends"><span>\u2190 Dark / grounding</span><span>Bright / forward \u2192</span></div>'
+    +'<div class="sfrow"><div style="flex:0 0 auto"><div style="font-size:.68rem;font-weight:600;color:var(--tx-m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">SF zone slope (2000\u20134000 Hz)</div>'
+    +'<div style="display:flex;align-items:center;gap:6px"><span class="bdg '+sfDB+'">'+(sfDev>2?'Peak forming':sfDev>0.5?'Moderate peak':'Broad / flat')+'</span><span style="font-size:.7rem;color:var(--tx-m)">'+sfSl+' dB/oct</span></div></div>'
+    +'<div style="flex:1;margin-left:12px"><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--tx-m);margin-bottom:4px"><span>Broad</span><span>Sharp peak</span></div>'
+    +'<div class="sfmini"><div style="height:100%;width:'+sfPct+'%;background:'+sfCol+';border-radius:3px"></div></div>'
+    +'<div style="font-size:.68rem;color:var(--tx-m);margin-top:3px">'+(sfDev>2?'SF zone resisting rolloff \u2014 focused resonance peak':sfDev>0.5?'Moderate peak forming \u2014 resonance concentrating':'Following overall rolloff \u2014 broad/diffuse activation')+'</div></div></div></div>';
+}
+
+var _zi=0;
+function bdg(t,l){var cm={strong:'bs',good:'bg',developing:'bd',needs:'bn',exceptional:'bs',present:'bd',wide:'bs',expressive:'bg',moderate:'bd',minimal:'bn',flat:'bn'};var dl={strong:'Strong',good:'Good',developing:'Developing',needs:'Needs attention',exceptional:'Exceptional',present:'Developing',wide:'Wide Carnatic',expressive:'Expressive',moderate:'Moderate',minimal:'Minimal',flat:'Flat'};return '<span class="bdg '+(cm[t]||'bd')+'">'+(l||dl[t]||t)+'</span>';}
+function cz(v){v=parseFloat(v);return v>=18?'strong':v>=10?'good':v>=4?'developing':'needs';}
+function csf(v){v=parseFloat(v);return v>=18?'exceptional':v>=12?'strong':v>=6?'present':'developing';}
+function cgk(v){v=parseFloat(v);return v>=5?'wide':v>=3?'expressive':v>=1.5?'moderate':'minimal';}
+function cpi(v){v=parseFloat(v);return v>=80?'strong':v>=40?'good':'developing';}
+
+function zRow(name,freq,tier,pct,color,tip,shT,shLbl,gapNote,darker,brighter){
+  var id='zd'+(++_zi);
+  var dt=tier==='needs'?'developing':tier==='exceptional'?'strong':tier==='present'?'developing':tier;
+  var tc=(dt==='developing'||dt==='needs')?'act':'ok';
+  var shBlock=shT?('<div class="shcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:.7rem;color:var(--tx-m)">SF zone shape</span>'+bdg(shT,shLbl)+'</div><div class="btrack"><div class="bfill" style="width:'+(shT==='strong'?90:shT==='good'?62:35)+'%;background:'+(shT==='strong'?'var(--grn)':shT==='good'?'var(--blu)':'var(--amb)')+'"></div></div><p style="font-size:.7rem;color:var(--tx-m);margin-top:4px;line-height:1.4">Broad plateau \u2192 Moderate peak \u2192 Sharp peak \u00b7 Sharp = focused therapeutic resonance</p></div>'):'';
+  var gnBlock=gapNote?'<p class="gnote">'+gapNote+'</p>':'';
+  return '<div class="zone"><div class="zhdr"><span class="zname">'+name+'</span><span class="zfreq">'+freq+'</span>'+bdg(dt)+((darker||brighter)?'<button class="dtog" onclick="(function(){var e=document.getElementById(\''+id+'\');if(e)e.classList.toggle(\'open\')})()">&#9662;</button>':'')+'</div>'
+    +'<div class="btrack"><div class="bfill" style="width:'+Math.max(3,Math.min(95,pct))+'%;background:'+color+'"></div></div>'
+    +(tip?'<p class="ztip '+tc+'">'+tip+'</p>':'')+gnBlock+shBlock
+    +'<div class="dbox" id="'+id+'">'+(darker?'<p class="dln"><span style="font-weight:600;color:var(--blu)">To lean darker: </span>'+darker+'</p>':'')+(brighter?'<p class="dln"><span style="font-weight:600;color:var(--amb)">To lean brighter: </span>'+brighter+'</p>':'')+'</div></div>';
+}
+
+function renderZones(m){
+  _zi=0;
+  var sfS=parseFloat(m.sf_str||0),sfGap=parseFloat(m.sf_gap||0),lo=parseFloat(m.low_max||0),mi=parseFloat(m.mid_max||0),sfM=parseFloat(m.sf_max||sfS*.9),up=parseFloat(m.upper_max||0),gk=parseFloat(m.gamaka||0),gkR=parseFloat(m.gamaka_rate||0),pi=parseFloat(m.pitch_iqr||30);
+  var shCode=m.sf_shape_code||'plateau',shLbl=m.sf_shape||'Broad plateau';
+  var shT=shCode==='sharp'?'strong':shCode==='moderate'?'good':'developing';
+  var gapNote=sfGap<0?'Gamaka-driven \u2014 full recording average exceeds single note (advanced Carnatic)':sfGap<2?'Highly consistent across the full recording':sfGap<5?'Good consistency \u2014 small variation':'Moderate variation \u2014 presence peaks on best notes';
+  var z='';
+  var lt=cz(lo);
+  z+=zRow('Low register','80\u2013500 Hz',lt,Math.max(5,Math.min(95,(lo+10)*4)),'var(--c-lo)',lt==='strong'||lt==='good'?'Warm harmonic foundation is well established \u2014 H'+(m.dominant_H||1)+' dominant. Grounding energy supports all higher zones.':'Lower harmonic foundation is developing. Daily humming on low comfortable pitches (5 minutes, jaw relaxed) is the most direct way to build lower harmonic energy.',null,null,null,'Sustain on lowest comfortable pitches. Feel vibration settle into the sternum.','Increase breath pressure gradually and bring placement slightly forward.');
+  var mt=cz(mi);
+  z+=zRow('Mid register','500\u20132500 Hz',mt,Math.max(5,Math.min(95,(mi+5)*3.5)),'var(--c-mi)',mt==='strong'||mt==='good'?'Solid mid-register presence \u2014 the voice projects naturally with good clarity and harmonic richness.':'Mid-register is the priority development area. Sustained open vowel exercises with full breath support are the foundational practice.',null,null,null,'Practise on lower pitches with the same breath support as the comfortable middle range.','Practise upper range with the same openness as the middle register.');
+  var st=csf(sfM);
+  z+=zRow('Presence zone (SF)','2500\u20133500 Hz',st,Math.max(5,Math.min(95,(sfM+2)*4.5)),'var(--c-sf)',st==='exceptional'||st==='strong'?'The Singer\'s Formant zone \u2014 the therapeutic resonance centre \u2014 is strongly activated across the full recording. This is what gives the voice its captivating, room-filling quality.':st==='present'?'The SF zone is present and developing. Gamakas and forward placement exercises activate this zone most directly.':'The SF zone needs deliberate development. Humming mmm opening slowly to may is the most direct route to forward resonance placement.',shT,shLbl,gapNote,'Slow the gamaka rate while maintaining full extent \u2014 let each arc breathe.','Increase gamaka rate while keeping width, or use brighter vowels on upper swaras.');
+  var ut=cz(up);
+  z+=zRow('Upper register','3500\u20138000 Hz',ut,Math.max(3,Math.min(95,(up+18)*3.5)),'var(--c-up)',ut==='strong'||ut==='good'?'Upper register is bright and present \u2014 consonants are crisp and the voice has natural sparkle that sustains listener alertness.':'Upper register is developing. Open vowels on upper pitches with a completely open throat will progressively develop this zone.',null,null,null,'Allow the upper register to recede naturally in deepest passages.','Bright vowels ee and ay or fast tongue-tip articulation will open this zone progressively.');
+  if(m.mode==='singer'){
+    var gkt=cgk(gk);
+    z+=zRow('Ornamental expression (gamaka)',gk+' st \u00b7 '+gkR+' Hz',gkt==='wide'?'strong':gkt==='expressive'?'good':gkt==='moderate'?'developing':'needs',Math.min(95,gk*14+10),'var(--c-gk)',gkt==='wide'?'Gamaka extent is at full Carnatic width \u2014 each ornament sweeps a wide arc that continuously activates the therapeutic SF zone.':gkt==='expressive'?'Good ornamental expression. There is room to widen each arc further toward full Carnatic extent.':gkt==='moderate'?'Gamaka extent is moderate. Widening through slow riyaz is the single most impactful development exercise.':'Begin with slow minda practice \u2014 a conscious slide between two adjacent swaras.',null,null,null,'Slow the gamaka rate while maintaining the full extent.','Increase gamaka rate while keeping the width for more forward energy.');
+  }else{
+    var pt=cpi(pi);
+    z+=zRow('Pitch expressiveness','prosodic variability',pt,Math.min(95,pi*0.7+10),'var(--c-pi)',pt==='strong'?'Wide pitch expressiveness is a natural asset \u2014 the voice moves freely and communicates emotional colour.':pt==='good'?'Good pitch variation. To expand further, practise telling stories rather than reading aloud.':'Pitch movement is contained. Identify three key phrases and deliberately raise pitch on the most important word in each.',null,null,null,'Use deliberate narrowing for quiet highest-impact moments.','Read a paragraph as if telling a story to a close friend.');
+  }
+  return z;
+}
+
+function resetApp(){
+  ST.mode=null;ST.ctx=null;ST.file=null;ST.busy=false;
+  hide('g-res');show('g-hdr');show('g-mode');
+  ['g-ctx','g-upsec','g-ancard'].forEach(hide);
+  G('g-msinger').classList.remove('on');G('g-mspeaker').classList.remove('on');
+  setBtn('Analyse voice',false);setWave(false);
+  hideE('g-anerr');hideE('g-uperr');G('g-fi').value='';
+}
+
+})();
+</script>
+</body>
+</html>
