@@ -276,9 +276,13 @@ async function runAnalysis(){
   var metrics,src;
   try{
     // Step 1: Acoustic analysis via Python backend
+    // 120s timeout — librosa analysis on 90s audio takes ~20-30s on server
     try{
       var fd=new FormData();fd.append('file',ST.file);fd.append('mode',ST.mode);
-      var r=await fetch('/api/analyse',{method:'POST',body:fd});
+      var ac1=new AbortController();
+      var t1=setTimeout(function(){ac1.abort();},120000);
+      var r=await fetch('/api/analyse',{method:'POST',body:fd,signal:ac1.signal});
+      clearTimeout(t1);
       if(!r.ok)throw new Error('HTTP '+r.status);
       var d=await r.json();if(!d.ok)throw new Error('backend error');
       metrics=d.metrics;src='python';
