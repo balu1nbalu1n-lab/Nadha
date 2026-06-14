@@ -27,7 +27,7 @@ from scipy.ndimage import uniform_filter1d
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.3.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,29 +57,30 @@ def analyse(audio_bytes, filename, mode):
         tmp.write(audio_bytes)
         tmp_path = tmp.name
 
-    # Convert to WAV via ffmpeg to avoid MP3 header corruption issues
-    # This ensures librosa receives clean audio regardless of source format
-    wav_path = tmp_path.replace(suffix, ".wav")
+    # Convert to WAV via ffmpeg — fixes MP3 header corruption
+    # Limit to 90 seconds to control memory usage
+    wav_path = tmp_path.replace(suffix, "_nada.wav")
+    load_path = tmp_path
     try:
         import subprocess
         result = subprocess.run(
             ["ffmpeg", "-i", tmp_path, "-ar", str(SR), "-ac", "1",
-             "-t", "120", wav_path, "-y", "-loglevel", "error"],
+             "-t", "90", wav_path, "-y", "-loglevel", "error"],
             capture_output=True, timeout=60
         )
-        if result.returncode != 0 or not os.path.exists(wav_path):
-            # ffmpeg failed — try loading directly
-            load_path = tmp_path
-        else:
+        if result.returncode == 0 and os.path.exists(wav_path):
             load_path = wav_path
         os.unlink(tmp_path)
+    except Exception as fe:
+        log.warning(f"ffmpeg conversion failed: {fe}, loading directly")
 
+    try:
         y, _ = librosa.load(load_path, sr=SR, mono=True)
     finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        if os.path.exists(wav_path):
-            os.unlink(wav_path)
+        for p in [tmp_path, wav_path]:
+            if os.path.exists(p):
+                try: os.unlink(p)
+                except: pass
 
     dur = len(y) / SR
     fmin = 60 if mode == "speaker" else 80
@@ -292,7 +293,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.3.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.4.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
