@@ -223,25 +223,21 @@ async def analyse_endpoint(file: UploadFile = File(...), mode: str = Form(...)):
 
 @app.post("/api/narrative")
 async def narrative_endpoint(request: Request):
-    """
-    Calls Claude API server-side using the server's ANTHROPIC_API_KEY.
-    Browser never sees or needs an API key.
-    """
     body   = await request.json()
     prompt = body.get("prompt", "")
     system = body.get("system", "")
     if not prompt: raise HTTPException(400, "Prompt required")
 
-    api_key = get_api_key()  # from server environment
+    api_key = get_api_key()
 
     payload = {
-        "model": "claude-sonnet-4-20250514",
+        "model": "claude-sonnet-4-6",
         "max_tokens": 1000,
         "system": system,
         "messages": [{"role": "user", "content": prompt}]
     }
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 json=payload,
@@ -251,19 +247,26 @@ async def narrative_endpoint(request: Request):
                     "content-type": "application/json",
                 }
             )
+        log.info(f"Claude API response status: {resp.status_code}")
         if not resp.is_success:
-            detail = resp.json().get("error", {}).get("message", f"HTTP {resp.status_code}")
+            raw = resp.text
+            log.error(f"Claude API error body: {raw}")
+            try:
+                detail = resp.json().get("error", {}).get("message", raw)
+            except Exception:
+                detail = raw
             raise HTTPException(resp.status_code, detail)
         data = resp.json()
         text = data["content"][0]["text"] if data.get("content") else ""
         return JSONResponse({"ok": True, "text": text})
     except httpx.TimeoutException:
-        raise HTTPException(504, "Claude API timed out")
+        log.error("Claude API timed out after 90s")
+        raise HTTPException(504, "Claude API timed out — please try again")
     except HTTPException:
         raise
     except Exception as e:
-        log.error(f"Narrative error: {e}")
-        raise HTTPException(502, f"Claude API error: {e}")
+        log.error(f"Narrative error detail: {type(e).__name__}: {e}")
+        raise HTTPException(502, f"Claude API error: {type(e).__name__}: {e}")
 
 
 @app.get("/api/health")
