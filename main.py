@@ -235,7 +235,7 @@ async def narrative_endpoint(request: Request):
     api_key = get_api_key()  # from server environment
 
     payload = {
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-4-20250514",
         "max_tokens": 1000,
         "system": system,
         "messages": [{"role": "user", "content": prompt}]
