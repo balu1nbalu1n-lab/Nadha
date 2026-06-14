@@ -1,5 +1,5 @@
 """
-Nada Voice Analysis - Backend Server v4
+Nada Voice Analysis - Backend Server v4.5
 API key stored as server environment variable - never exposed to browser.
 Users just upload and analyse - no configuration needed.
 
@@ -7,27 +7,18 @@ Deploy on Render:
   Build:  pip install -r requirements.txt
   Start:  uvicorn main:app --host 0.0.0.0 --port $PORT
   Env:    ANTHROPIC_API_KEY = your key from console.anthropic.com
-
-Run locally:
-  export ANTHROPIC_API_KEY=sk-ant-...
-  uvicorn main:app --host 0.0.0.0 --port 8000
-  Open: http://localhost:8000
 """
-import os, tempfile, logging
-import numpy as np
+import os, tempfile, logging, subprocess
 import httpx
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-import librosa
-from scipy.signal import savgol_filter
-from scipy.ndimage import uniform_filter1d
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.4.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,6 +43,11 @@ def get_api_key():
 # ── ACOUSTIC ANALYSIS ─────────────────────────────────────────
 
 def analyse(audio_bytes, filename, mode):
+    # Import heavy libraries here (lazy load) — keeps startup memory low
+    import numpy as np
+    import librosa
+    from scipy.signal import savgol_filter
+    from scipy.ndimage import uniform_filter1d
     suffix = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(audio_bytes)
@@ -293,7 +289,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.4.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.5.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
