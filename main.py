@@ -27,7 +27,7 @@ from scipy.ndimage import uniform_filter1d
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.1.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,8 +37,8 @@ app.add_middleware(
 )
 
 SR = 22050      # Full precision sample rate (8 GB RAM available on Starter plan)
-N_FFT = 4096    # Full precision FFT
-HOP = 512       # Standard hop length
+N_FFT = 2048    # Balanced - good resolution, faster processing
+HOP = 256       # Proportional to N_FFT
 SF_LOW, SF_HIGH = 2500, 3500
 
 # API key lives on the server only - never sent to browser
@@ -58,7 +58,7 @@ def analyse(audio_bytes, filename, mode):
         path = tmp.name
     try:
         # Cap at 90 seconds — sufficient for accurate analysis, processes in ~20s on 0.5 CPU
-        y, _ = librosa.load(path, sr=SR, mono=True, duration=90.0)
+        y, _ = librosa.load(path, sr=SR, mono=True, duration=60.0)
     finally:
         os.unlink(path)
 
@@ -273,7 +273,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.1.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.2.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
