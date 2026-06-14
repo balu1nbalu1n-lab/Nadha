@@ -27,7 +27,7 @@ from scipy.ndimage import uniform_filter1d
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.0.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,9 +36,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SR = 22050
-N_FFT = 4096
-HOP = 512
+SR = 22050      # Full precision sample rate (8 GB RAM available on Starter plan)
+N_FFT = 4096    # Full precision FFT
+HOP = 512       # Standard hop length
 SF_LOW, SF_HIGH = 2500, 3500
 
 # API key lives on the server only - never sent to browser
@@ -57,7 +57,7 @@ def analyse(audio_bytes, filename, mode):
         tmp.write(audio_bytes)
         path = tmp.name
     try:
-        y, _ = librosa.load(path, sr=SR, mono=True)
+        y, _ = librosa.load(path, sr=SR, mono=True)  # full file, no duration cap
     finally:
         os.unlink(path)
 
@@ -237,7 +237,7 @@ async def narrative_endpoint(request: Request):
         "messages": [{"role": "user", "content": prompt}]
     }
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 json=payload,
@@ -272,7 +272,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.0.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.1.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
