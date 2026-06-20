@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.6.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.6.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -349,7 +349,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.6.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.6.1", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
