@@ -393,7 +393,7 @@ function buildPrompt(m,ctx){
     'SF zone retention score: '+sfRet+' dB (higher = more resonance held, peak forming)',
     'SF zone: '+sf+' dB above rolloff ('+sfD+')',
     'SF LTAS: '+m.sf_ltas+'. SF Gap: '+sfGd,
-    'SF shape: '+m.sf_shape,'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics);
+    'SF shape: '+m.sf_shape+(m.sf_shape_reliable===false?' (the standard shape-fit was inconclusive on this sparse-harmonic signal; classification instead relies on the directly-measured peak strength, which is robust here)':''),'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics);
   if(sigType!=='drone'){
     if(m.mode==='singer')L.push('Gamaka: '+m.gamaka+' st ('+gkD+'). Rate: '+m.gamaka_rate+' Hz');
     else L.push('Pitch IQR: '+m.pitch_iqr+' Hz');
@@ -457,18 +457,23 @@ function renderSlope(m){
   var sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0);
   var isIdeal=sl>=-10&&sl<=-6;
   var sfCode=m.sf_shape_code||'plateau';
-  var sfPct=sfCode==='sharp'?92:sfCode==='moderate'?62:sfCode==='plateau'?35:15;
-  var sfCol=sfCode==='sharp'?'var(--grn)':sfCode==='moderate'?'var(--blu)':'var(--amb)';
-  var sfDB=sfRet>2?'bs':sfRet>0.5?'bg':'bd';
+  var sfLbl=m.sf_shape||(sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad / flat');
+  var sfPct=sfCode==='sharp'?92:sfCode==='moderate'?62:sfCode==='sparse_strong'?78:sfCode==='plateau'?35:15;
+  var sfCol=sfCode==='sharp'?'var(--grn)':sfCode==='moderate'?'var(--blu)':sfCode==='sparse_strong'?'var(--grn)':'var(--amb)';
+  var sfDB=sfCode==='sharp'||sfCode==='sparse_strong'?'bs':sfCode==='moderate'?'bg':'bd';
+  var isUnreliable=m.sf_shape_reliable===false;
+  var noteText=isUnreliable
+    ? 'Sparse, sharply isolated harmonics (typical of a drone) made the usual shape-fit inconclusive \u2014 classification instead relies on the directly measured peak strength ('+(m.sf_str!=null?'+'+m.sf_str+' dB':'')+' above rolloff), which stays reliable on this kind of signal.'
+    : (sfRet>2?'SF zone resisting rolloff \u2014 focused resonance peak':sfRet>0.5?'Moderate peak forming \u2014 resonance concentrating':'Following overall rolloff \u2014 broad/diffuse activation');
   return '<div style="margin-bottom:1.25rem">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><span style="font-size:.875rem;font-weight:600;color:var(--tx)">Spectral slope (overall)</span><span class="bdg '+tier+'">'+lbl+'</span></div>'
     +'<div class="sgrad">'+(isIdeal?'<div class="sideal"></div>':'')+'<div class="scur" style="left:'+pos+'%"></div></div>'
     +'<div class="sends"><span>\u2190 Dark / grounding</span><span>Bright / forward \u2192</span></div>'
     +'<div class="sfrow"><div style="flex:0 0 auto"><div style="font-size:.68rem;font-weight:600;color:var(--tx-m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">SF zone retention (2000\u20134000 Hz)</div>'
-    +'<div style="display:flex;align-items:center;gap:6px"><span class="bdg '+sfDB+'">'+(sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad / flat')+'</span><span style="font-size:.7rem;color:var(--tx-m)">'+sfRet+' dB</span></div></div>'
+    +'<div style="display:flex;align-items:center;gap:6px"><span class="bdg '+sfDB+'">'+sfLbl+'</span><span style="font-size:.7rem;color:var(--tx-m)">'+sfRet+' dB</span></div></div>'
     +'<div style="flex:1;margin-left:12px"><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--tx-m);margin-bottom:4px"><span>Broad</span><span>Sharp peak</span></div>'
     +'<div class="sfmini"><div style="height:100%;width:'+sfPct+'%;background:'+sfCol+';border-radius:3px"></div></div>'
-    +'<div style="font-size:.68rem;color:var(--tx-m);margin-top:3px">'+(sfRet>2?'SF zone resisting rolloff \u2014 focused resonance peak':sfRet>0.5?'Moderate peak forming \u2014 resonance concentrating':'Following overall rolloff \u2014 broad/diffuse activation')+'</div></div></div></div>';
+    +'<div style="font-size:.68rem;color:var(--tx-m);margin-top:3px">'+noteText+'</div></div></div></div>';
 }
 
 var _zi=0;
@@ -494,7 +499,7 @@ function renderZones(m){
   _zi=0;
   var sfS=parseFloat(m.sf_str||0),sfGap=parseFloat(m.sf_gap||0),lo=parseFloat(m.low_max||0),mi=parseFloat(m.mid_max||0),sfM=parseFloat(m.sf_max||sfS*.9),up=parseFloat(m.upper_max||0),gk=parseFloat(m.gamaka||0),gkR=parseFloat(m.gamaka_rate||0),pi=parseFloat(m.pitch_iqr||30);
   var shCode=m.sf_shape_code||'plateau',shLbl=m.sf_shape||'Broad plateau';
-  var shT=shCode==='sharp'?'strong':shCode==='moderate'?'good':'developing';
+  var shT=shCode==='sharp'||shCode==='sparse_strong'?'strong':shCode==='moderate'?'good':'developing';
   var gapNote=m.mode==='singer'
     ?(sfGap<0?'Gamaka-driven \u2014 full recording average exceeds single note (advanced Carnatic)':sfGap<2?'Highly consistent across the full recording':sfGap<5?'Good consistency \u2014 small variation':'Moderate variation \u2014 presence peaks on best notes')
     :(sfGap<2?'Highly consistent resonance across the full recording':sfGap<5?'Good consistency across speech':'Moderate variation \u2014 resonance peaks on strongest phrases');
