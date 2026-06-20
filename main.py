@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.7.1")
+app = FastAPI(title="Nada Voice Analysis", version="4.7.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,13 +42,24 @@ def get_api_key():
 
 # ── ACOUSTIC ANALYSIS ─────────────────────────────────────────
 
-def classify_signal_type(f0_full, fmin):
+def classify_signal_type(y, sr):
     """
     Classifies the recording as melody / drone / speech using
     note-plateau-fraction — validated against real recordings:
-      Drone (D.m4a, F.m4a):        ~90-100% plateau, robust CV ~0.0003
+      Drone (D.m4a, F.m4a, C.m4a):  ~90-100% plateau, robust CV ~0.0003
       Melody (8 Carnatic pieces):   ~35-50% plateau, robust CV 0.30-0.50
       Speech (Speak-2.m4a):         <10% plateau,    robust CV ~0.26
+
+    IMPORTANT: this runs its OWN independent YIN pass with a fixed,
+    wide fmin=50Hz — deliberately decoupled from the mode-dependent
+    fmin (60 for speaker, 80 for singer) used elsewhere for harmonic
+    analysis. We confirmed on three different low drones (C, D, F.m4a)
+    that using the mode's fmin here causes YIN to lock onto a wrong
+    octave/harmonic when the true fundamental sits close to or below
+    that fmin floor — producing wildly unstable plateau/CV numbers
+    purely as an artifact of which coaching mode button was clicked,
+    not anything about the actual recording. A single fixed, wide
+    fmin for classification purposes only avoids that dependency.
 
     Plateau fraction is far more reliable than raw pitch variance —
     speech can have WIDE pitch range (prosody) without ever holding
@@ -58,7 +69,11 @@ def classify_signal_type(f0_full, fmin):
     which we confirmed occur even on genuinely clean drone instruments.
     """
     import numpy as np
-    voiced = f0_full[(f0_full > fmin * 0.9) & (f0_full < 900)]
+    import librosa
+    CLASSIFIER_FMIN = 50
+
+    f0_full = librosa.yin(y, fmin=CLASSIFIER_FMIN, fmax=900, sr=sr)
+    voiced = f0_full[(f0_full > CLASSIFIER_FMIN * 0.9) & (f0_full < 900)]
     if len(voiced) < 20:
         return {"signal_type": "unknown", "plateau_fraction": 0.0, "robust_cv": 0.0}
 
@@ -135,7 +150,7 @@ def analyse(audio_bytes, filename, mode):
     f0_full = librosa.yin(y, fmin=fmin, fmax=900, sr=SR)
     voiced = f0_full[(f0_full > fmin * 0.9) & (f0_full < 900)]
 
-    signal_info = classify_signal_type(f0_full, fmin)
+    signal_info = classify_signal_type(y, SR)
     log.info(f"Signal type: {signal_info['signal_type']} "
              f"(plateau={signal_info['plateau_fraction']:.1%}, "
              f"robust_cv={signal_info['robust_cv']:.4f})")
@@ -361,7 +376,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.7.1", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.7.2", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
