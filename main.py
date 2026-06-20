@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.7.2")
+app = FastAPI(title="Nada Voice Analysis", version="4.8.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -243,6 +243,24 @@ def analyse(audio_bytes, filename, mode):
     elif sf_retention > -0.5: sf_shape, sf_code = "Broad plateau",           "plateau"
     else:                     sf_shape, sf_code = "Below trend",             "below"
 
+    # Known limitation: the retention trend-fit assumes a smooth, continuous
+    # spectral envelope around the peak. That assumption holds for sung melody
+    # (formants smear harmonics into a continuous-looking bump) but breaks for
+    # drone instruments with sparse, sharply isolated harmonics and deep
+    # valleys between them — confirmed on D.m4a, F.m4a, and other real drone
+    # recordings, where retention reads "Below trend" despite a genuinely
+    # strong, sharp peak that sf_str (a single-point peak-vs-rolloff measure,
+    # robust to sparse harmonics) correctly captures.
+    #
+    # When the signal is classified as a drone AND retention disagrees with
+    # a strong sf_str reading, trust sf_str and flag the result as such,
+    # rather than presenting an inconclusive retention verdict as definitive.
+    sf_shape_reliable = True
+    if signal_info["signal_type"] == "drone" and sf_code in ("plateau", "below") and sf_str >= 15:
+        sf_shape = "Strong peak (sparse harmonics)"
+        sf_code = "sparse_strong"
+        sf_shape_reliable = False
+
     def zone(flo, fhi, rlo=400, rhi=1500):
         zm = (freqs >= flo) & (freqs <= fhi)
         rm = (freqs >= rlo) & (freqs <= rhi)
@@ -297,7 +315,7 @@ def analyse(audio_bytes, filename, mode):
         "sf_retention": sf_retention,
         "sf_slope_local": sf_zone_trend,      # legacy alias
         "sf_slope_deviation": -sf_retention,  # legacy alias (old sign convention)
-        "sf_shape": sf_shape, "sf_shape_code": sf_code,
+        "sf_shape": sf_shape, "sf_shape_code": sf_code, "sf_shape_reliable": sf_shape_reliable,
         "low_max":   zone(80,   500,  200, 800),
         "mid_max":   zone(500,  2500, 400, 1500),
         "sf_max":    zone(2500, 3500, 500, 1500),
@@ -376,7 +394,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.7.2", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.8.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
