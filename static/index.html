@@ -385,7 +385,7 @@ function buildPrompt(m,ctx){
   } else {
     L.push('SIGNAL TYPE: MELODY — distinct held notes (swaras) consistent with singing. Use the MELODY/SPEECH coaching structure.');
   }
-  L.push('Plateau fraction (pitch stability): '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'%','',
+  L.push('Plateau fraction (pitch stability): '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'%. Pitch variability (robust CV): '+(m.robust_cv!=null?m.robust_cv.toFixed(4):'?')+' (near-zero = single sustained pitch; 0.3-0.5 = typical melodic movement)','',
     (sigType==='drone'?'Tone':'Voice')+' for a '+(m.mode==='singer'?'singer':'speaker')+' context. Context label: '+(ctx||''),
     'F0: '+m.f0+' Hz ('+m.vtype+'). Duration: '+m.duration+'s. Dominant H'+(m.dominant_H||1),
     'Overall slope: '+m.slope+' dB/oct ('+sD+')',
@@ -432,7 +432,7 @@ function buildGrid(m){
   var sigType=m.signal_type||'melody';
   var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like':'Melodic';
   var cells=[
-    {l:'Signal type',v:sigLbl,s:'plateau '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'%'},
+    {l:'Signal type',v:sigLbl,s:'plateau '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'% \u00b7 CV '+(m.robust_cv!=null?m.robust_cv.toFixed(4):'?')},
     {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
     {l:'Overall slope',v:slL(sl),s:m.slope+' dB/oct'},
     {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:'+'+sf+' dB'},
