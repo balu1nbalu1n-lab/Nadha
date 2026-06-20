@@ -213,7 +213,7 @@ var SPEAKER_CTX=[
   {id:'broadcast',label:'Professional / broadcast',sub:'Podcast, voiceover, media'}
 ];
 
-var SYS='You are Nada, an expert voice analyst with deep knowledge of acoustic science, Carnatic music, voice therapy and communication coaching.\n\nWrite a SINGLE flowing narrative of 3-4 paragraphs. No bullet points, no headers, no raw numbers. Write warmly in second person. 250-320 words.\n\nThe prompt will tell you the detected SIGNAL TYPE. Follow the matching structure below exactly:\n\nIF SIGNAL TYPE IS MELODY OR SPEECH (a developing voice being coached):\n1. Open with the most distinctive positive quality of this voice\n2. Describe what the voice feels like to a listener\n3. Address the area with most growth potential - frame as invitation not criticism\n4. Close with one specific actionable practice suggestion for the SINGER OR SPEAKER\n\nIF SIGNAL TYPE IS DRONE (a sustained instrument or vocal drone tone, e.g. shruti box, tanpura, or a held vocal pitch with no melodic movement):\nThis is NOT a developing voice being coached. Do NOT use coaching language, do NOT suggest vocal practice exercises, do NOT say "your voice has untapped potential" or similar growth-framing. Instead:\n1. Open by describing the acoustic character of this sustained tone - its tonal color, richness, and resonance quality, as you would describe an instrument or a sound object\n2. Describe what listening to this drone feels like - its atmosphere, weight, and effect on a space or a listener\'s state\n3. Note any acoustic characteristic objectively (e.g. how broadly or narrowly the harmonic energy is distributed) without framing it as something to "improve" - frame it simply as a descriptive observation\n4. Close by describing the drone\'s suitability for its likely use (meditation anchor, raga tonic reference, ambient grounding) rather than a practice exercise\nNever mention gamaka, vocal training, or practice suggestions for a drone. Never call it "your voice" being coached - refer to it as "this tone" or "this drone."\n\nACOUSTIC GUIDE:\nOverall slope dB/oct: -14 to -18=very dark; -10 to -14=warm/settled; -6 to -10=ideal balanced; -3 to -6=bright/forward\nSF zone: under 5=developing; 5-10=emerging; 10-15=present; 15-20=strong; over 20=exceptional\nSF zone slope: shallower than overall means SF zone resists rolloff meaning resonance peak forming\nSF Gap (singers only): negative means voice peaks in movement (advanced Carnatic); 0-2=excellent; 2-5=good; over 5=variable\nSF Gap (speakers): negative or near zero means highly consistent presence across speech; higher means variable\nGamaka semitones (SINGERS ONLY - do not mention for speakers or drones): under 1.5=minimal; 1.5-3=moderate; 3-5=expressive; over 5=full Carnatic\nFor SPEAKER mode: focus on clarity, projection, resonance consistency, pitch expressiveness. Never mention gamaka for speakers.\nNever say dB values. Translate everything to experiential language.';
+var SYS='You are Nada, an expert voice analyst with deep knowledge of acoustic science, Carnatic music, voice therapy and communication coaching.\n\nWrite a SINGLE flowing narrative of 3-4 paragraphs. No bullet points, no headers, no raw numbers. Write warmly in second person. 250-320 words.\n\nThe prompt will tell you the detected SIGNAL TYPE. Follow the matching structure below exactly:\n\nIF SIGNAL TYPE IS MELODY OR SPEECH (a developing voice being coached):\n1. Open with the most distinctive positive quality of this voice\n2. Describe what the voice feels like to a listener\n3. Address the area with most growth potential - frame as invitation not criticism\n4. Close with one specific actionable practice suggestion for the SINGER OR SPEAKER\n\nIF SIGNAL TYPE IS DRONE (a sustained instrument or vocal drone tone, e.g. shruti box, tanpura, or a held vocal pitch with no melodic movement):\nThis is NOT a developing voice being coached. Do NOT use coaching language, do NOT suggest vocal practice exercises, do NOT say "your voice has untapped potential" or similar growth-framing. Instead:\n1. Open by describing the acoustic character of this sustained tone - its tonal color, richness, and resonance quality, as you would describe an instrument or a sound object\n2. Describe what listening to this drone feels like - its atmosphere, weight, and effect on a space or a listener\'s state\n3. Note any acoustic characteristic objectively (e.g. how broadly or narrowly the harmonic energy is distributed) without framing it as something to "improve" - frame it simply as a descriptive observation\n4. Close by describing the drone\'s suitability for its likely use (meditation anchor, raga tonic reference, ambient grounding) rather than a practice exercise\nNever mention gamaka, vocal training, or practice suggestions for a drone. Never call it "your voice" being coached - refer to it as "this tone" or "this drone."\n\nACOUSTIC GUIDE:\nOverall slope dB/oct: -14 to -18=very dark; -10 to -14=warm/settled; -6 to -10=ideal balanced; -3 to -6=bright/forward\nSF zone: under 5=developing; 5-10=emerging; 10-15=present; 15-20=strong; over 20=exceptional\nSF zone retention: positive retention means the SF zone trend is shallower than overall, meaning SF zone resists rolloff, meaning resonance peak forming. Negative retention means SF zone falls away faster than the rest of the voice, meaning no peak, broad/flat activation\nSF Gap (singers only): negative means voice peaks in movement (advanced Carnatic); 0-2=excellent; 2-5=good; over 5=variable\nSF Gap (speakers): negative or near zero means highly consistent presence across speech; higher means variable\nGamaka semitones (SINGERS ONLY - do not mention for speakers or drones): under 1.5=minimal; 1.5-3=moderate; 3-5=expressive; over 5=full Carnatic\nFor SPEAKER mode: focus on clarity, projection, resonance consistency, pitch expressiveness. Never mention gamaka for speakers.\nNever say dB values. Translate everything to experiential language.';
 
 var ST={mode:null,ctx:null,file:null,busy:false};
 
@@ -338,12 +338,12 @@ function browserAnalyse(buf,mode){
   var slx=sfB.map(function(b){return Math.log2(b.fc+1);}),sly=sfB.map(function(b){return 10*Math.log10(b.e+1e-10);});
   var smx=slx.reduce(function(a,b){return a+b;},0)/4,smy=sly.reduce(function(a,b){return a+b;},0)/4,snu=0,sde=0;
   for(var i=0;i<4;i++){snu+=(slx[i]-smx)*(sly[i]-smy);sde+=(slx[i]-smx)*(slx[i]-smx);}
-  var sfSl=Math.max(-20,Math.min(0,sde>0?snu/sde:slope));
-  var sfDev=parseFloat((slope-sfSl).toFixed(2));
+  var sfZoneTrend=Math.max(-20,Math.min(0,sde>0?snu/sde:slope));
+  var sfRetention=parseFloat((sfZoneTrend-slope).toFixed(2));
   var sfShape,sfCode;
-  if(sfDev>3.5){sfShape='Sharp concentrated peak';sfCode='sharp';}
-  else if(sfDev>1.2){sfShape='Moderate focused peak';sfCode='moderate';}
-  else if(sfDev>-0.5){sfShape='Broad plateau';sfCode='plateau';}
+  if(sfRetention>3.5){sfShape='Sharp concentrated peak';sfCode='sharp';}
+  else if(sfRetention>1.2){sfShape='Moderate focused peak';sfCode='moderate';}
+  else if(sfRetention>-0.5){sfShape='Broad plateau';sfCode='plateau';}
   else{sfShape='Below trend';sfCode='below';}
   var pSF=my+(slope/1)*(Math.log2(3000)-mx),aSF=10*Math.log10(eSF+1e-10),sfS=Math.max(0,aSF-pSF+8+sq*6);
   var half=Math.floor(ch.length/2),s2=ch.slice(half,Math.min(half+N,ch.length)),sfE2=0;
@@ -363,17 +363,17 @@ function browserAnalyse(buf,mode){
   var rD=tD(eMl);
   return{mode:mode,duration:dur.toFixed(1),f0:f0.toFixed(1),vtype:vt,slope:slope.toFixed(2),
     sf_str:sfS.toFixed(1),sf_ltas:sfL.toFixed(1),sf_gap:sfGap,sf_shape:sfShape,sf_shape_code:sfCode,
-    sf_slope_local:sfSl.toFixed(2),sf_slope_deviation:sfDev,dominant_H:dH,n_harmonics:nH,
+    sf_zone_trend:sfZoneTrend.toFixed(2),sf_retention:sfRetention,dominant_H:dH,n_harmonics:nH,
     hnr:hnr.toFixed(1),gamaka:gk.toFixed(1),gamaka_rate:gkR.toFixed(1),pitch_iqr:pIqr.toFixed(0),
     low_max:(tD(eL)-rD+5).toFixed(1),mid_max:(tD(eMh)-rD+12).toFixed(1),
     sf_max:Math.max(0,sfS*.9).toFixed(1),upper_max:(tD(eU)-rD-2).toFixed(1)};
 }
 
 function buildPrompt(m,ctx){
-  var sfG=parseFloat(m.sf_gap||0),sl=parseFloat(m.slope),sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0),sf=parseFloat(m.sf_str||0),gk=parseFloat(m.gamaka||0);
+  var sfG=parseFloat(m.sf_gap||0),sl=parseFloat(m.slope),sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0),sf=parseFloat(m.sf_str||0),gk=parseFloat(m.gamaka||0);
   var sfGd=sfG<0?(m.mode==='singer'?'negative, voice peaks in movement (gamaka-driven, advanced Carnatic)':'negative, highly consistent presence across speech'):sfG<2?'excellent consistency':sfG<5?'good':'moderate variation';
   var sD=sl<-13?'very dark':sl<-10?'warm/settled':sl<-6?'ideal balanced':sl<-3?'bright/forward':'very bright';
-  var sfSlD=sfDev>2?'shallower than overall, resonance peak forming':sfDev>0.5?'moderately shallower, moderate peak':'following overall rolloff, broad activation';
+  var sfRetD=sfRet>2?'SF zone retains energy well above the overall trend, resonance peak forming':sfRet>0.5?'moderate retention, moderate peak':'little retention, following overall rolloff, broad activation';
   var sfD=sf>=20?'exceptional':sf>=15?'strong':sf>=10?'present':'developing';
   var gkD=gk>=5?'full Carnatic width':gk>=3?'wide expressive':gk>=1.5?'moderate':'minimal';
   var sigType=m.signal_type||'melody';
@@ -389,8 +389,8 @@ function buildPrompt(m,ctx){
     (sigType==='drone'?'Tone':'Voice')+' for a '+(m.mode==='singer'?'singer':'speaker')+' context. Context label: '+(ctx||''),
     'F0: '+m.f0+' Hz ('+m.vtype+'). Duration: '+m.duration+'s. Dominant H'+(m.dominant_H||1),
     'Overall slope: '+m.slope+' dB/oct ('+sD+')',
-    'SF zone slope 2000-4000 Hz: '+sfSl+' dB/oct ('+sfSlD+')',
-    'SF zone deviation: '+sfDev+' dB',
+    'SF zone retention 2000-4000 Hz: '+sfZT+' dB/oct local trend ('+sfRetD+')',
+    'SF zone retention score: '+sfRet+' dB (higher = more resonance held, peak forming)',
     'SF zone: '+sf+' dB above rolloff ('+sfD+')',
     'SF LTAS: '+m.sf_ltas+'. SF Gap: '+sfGd,
     'SF shape: '+m.sf_shape,'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics);
@@ -427,7 +427,7 @@ function showResult(m,assess,src,ctxL){
 }
 
 function buildGrid(m){
-  var sl=parseFloat(m.slope),sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0),sfGap=parseFloat(m.sf_gap||0),sf=parseFloat(m.sf_str||0);
+  var sl=parseFloat(m.slope),sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0),sfGap=parseFloat(m.sf_gap||0),sf=parseFloat(m.sf_str||0);
   function slL(v){return v<-13?'Dark':v<-10?'Warm dark':v<-6?'Ideal':v<-3?'Bright':'Very bright';}
   var sigType=m.signal_type||'melody';
   var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like':'Melodic';
@@ -436,7 +436,7 @@ function buildGrid(m){
     {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
     {l:'Overall slope',v:slL(sl),s:m.slope+' dB/oct'},
     {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:'+'+sf+' dB'},
-    {l:'SF zone slope',v:sfDev>2?'Peak forming':sfDev>0.5?'Moderate peak':'Broad/flat',s:sfSl+' dB/oct'},
+    {l:'SF zone retention',v:sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad/flat',s:sfRet+' dB'},
     {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
     {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
   ];
@@ -454,21 +454,21 @@ function sTier(v){return(v>=-10&&v<=-6)?'bs':v>-12?'bg':'bd';}
 
 function renderSlope(m){
   var sl=parseFloat(m.slope),pos=sPos(sl),lbl=sLbl(sl),tier=sTier(sl);
-  var sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0);
+  var sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0);
   var isIdeal=sl>=-10&&sl<=-6;
   var sfCode=m.sf_shape_code||'plateau';
   var sfPct=sfCode==='sharp'?92:sfCode==='moderate'?62:sfCode==='plateau'?35:15;
   var sfCol=sfCode==='sharp'?'var(--grn)':sfCode==='moderate'?'var(--blu)':'var(--amb)';
-  var sfDB=sfDev>2?'bs':sfDev>0.5?'bg':'bd';
+  var sfDB=sfRet>2?'bs':sfRet>0.5?'bg':'bd';
   return '<div style="margin-bottom:1.25rem">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><span style="font-size:.875rem;font-weight:600;color:var(--tx)">Spectral slope (overall)</span><span class="bdg '+tier+'">'+lbl+'</span></div>'
     +'<div class="sgrad">'+(isIdeal?'<div class="sideal"></div>':'')+'<div class="scur" style="left:'+pos+'%"></div></div>'
     +'<div class="sends"><span>\u2190 Dark / grounding</span><span>Bright / forward \u2192</span></div>'
-    +'<div class="sfrow"><div style="flex:0 0 auto"><div style="font-size:.68rem;font-weight:600;color:var(--tx-m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">SF zone slope (2000\u20134000 Hz)</div>'
-    +'<div style="display:flex;align-items:center;gap:6px"><span class="bdg '+sfDB+'">'+(sfDev>2?'Peak forming':sfDev>0.5?'Moderate peak':'Broad / flat')+'</span><span style="font-size:.7rem;color:var(--tx-m)">'+sfSl+' dB/oct</span></div></div>'
+    +'<div class="sfrow"><div style="flex:0 0 auto"><div style="font-size:.68rem;font-weight:600;color:var(--tx-m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">SF zone retention (2000\u20134000 Hz)</div>'
+    +'<div style="display:flex;align-items:center;gap:6px"><span class="bdg '+sfDB+'">'+(sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad / flat')+'</span><span style="font-size:.7rem;color:var(--tx-m)">'+sfRet+' dB</span></div></div>'
     +'<div style="flex:1;margin-left:12px"><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--tx-m);margin-bottom:4px"><span>Broad</span><span>Sharp peak</span></div>'
     +'<div class="sfmini"><div style="height:100%;width:'+sfPct+'%;background:'+sfCol+';border-radius:3px"></div></div>'
-    +'<div style="font-size:.68rem;color:var(--tx-m);margin-top:3px">'+(sfDev>2?'SF zone resisting rolloff \u2014 focused resonance peak':sfDev>0.5?'Moderate peak forming \u2014 resonance concentrating':'Following overall rolloff \u2014 broad/diffuse activation')+'</div></div></div></div>';
+    +'<div style="font-size:.68rem;color:var(--tx-m);margin-top:3px">'+(sfRet>2?'SF zone resisting rolloff \u2014 focused resonance peak':sfRet>0.5?'Moderate peak forming \u2014 resonance concentrating':'Following overall rolloff \u2014 broad/diffuse activation')+'</div></div></div></div>';
 }
 
 var _zi=0;
