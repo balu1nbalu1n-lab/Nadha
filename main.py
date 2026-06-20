@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.5.1")
+app = FastAPI(title="Nada Voice Analysis", version="4.6.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +41,58 @@ def get_api_key():
 
 
 # ── ACOUSTIC ANALYSIS ─────────────────────────────────────────
+
+def classify_signal_type(f0_full, fmin):
+    """
+    Classifies the recording as melody / drone / speech using
+    note-plateau-fraction — validated against real recordings:
+      Drone (D.m4a, F.m4a):        ~90-100% plateau, robust CV ~0.0003
+      Melody (8 Carnatic pieces):   ~35-50% plateau, robust CV 0.30-0.50
+      Speech (Speak-2.m4a):         <10% plateau,    robust CV ~0.26
+
+    Plateau fraction is far more reliable than raw pitch variance —
+    speech can have WIDE pitch range (prosody) without ever holding
+    a stable note, while melody holds discrete swara/note pitches.
+    Robust (MAD-based) CV is used as a secondary signal because
+    raw std/mean is corrupted by YIN octave-jump tracking glitches,
+    which we confirmed occur even on genuinely clean drone instruments.
+    """
+    import numpy as np
+    voiced = f0_full[(f0_full > fmin * 0.9) & (f0_full < 900)]
+    if len(voiced) < 20:
+        return {"signal_type": "unknown", "plateau_fraction": 0.0, "robust_cv": 0.0}
+
+    med = float(np.median(voiced))
+    mad = float(np.median(np.abs(voiced - med)))
+    robust_cv = (mad * 1.4826) / med if med > 0 else 0.0
+
+    semitones = 12 * np.log2(voiced / med)
+    quantized = np.round(semitones)
+    runs = []
+    current_run = 1
+    for i in range(1, len(quantized)):
+        if quantized[i] == quantized[i - 1]:
+            current_run += 1
+        else:
+            runs.append(current_run)
+            current_run = 1
+    runs.append(current_run)
+    long_runs = [r for r in runs if r >= 8]
+    plateau_fraction = float(sum(long_runs) / len(quantized)) if long_runs else 0.0
+
+    if plateau_fraction > 0.70:
+        signal_type = "drone"
+    elif plateau_fraction < 0.15:
+        signal_type = "speech"
+    else:
+        signal_type = "melody"
+
+    return {
+        "signal_type": signal_type,
+        "plateau_fraction": round(plateau_fraction, 3),
+        "robust_cv": round(robust_cv, 4),
+    }
+
 
 def analyse(audio_bytes, filename, mode):
     # Import heavy libraries here (lazy load) — keeps startup memory low
@@ -82,6 +134,11 @@ def analyse(audio_bytes, filename, mode):
     fmin = 60 if mode == "speaker" else 80
     f0_full = librosa.yin(y, fmin=fmin, fmax=900, sr=SR)
     voiced = f0_full[(f0_full > fmin * 0.9) & (f0_full < 900)]
+
+    signal_info = classify_signal_type(f0_full, fmin)
+    log.info(f"Signal type: {signal_info['signal_type']} "
+             f"(plateau={signal_info['plateau_fraction']:.1%}, "
+             f"robust_cv={signal_info['robust_cv']:.4f})")
 
     seg_len = int(5.0 * SR)
     best_s, best_std = 0, np.inf
@@ -204,6 +261,9 @@ def analyse(audio_bytes, filename, mode):
     return {
         "mode": mode, "duration": round(dur,1), "filename": filename,
         "f0": round(f0,1), "note": note, "vtype": vtype,
+        "signal_type": signal_info["signal_type"],
+        "plateau_fraction": signal_info["plateau_fraction"],
+        "robust_cv": signal_info["robust_cv"],
         "n_harmonics": len(harmonics), "h_strong": h_strong, "h_good": h_good,
         "dominant_H": dom_h["H"], "dominant_hz": round(dom_h["hz"],1),
         "slope": slope,
@@ -289,7 +349,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.5.1", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.6.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
