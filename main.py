@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.6.2")
+app = FastAPI(title="Nada Voice Analysis", version="4.7.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -208,15 +208,21 @@ def analyse(audio_bytes, filename, mode):
 
     approach = (freqs >= 2000) & (freqs <= 4000)
     if np.sum(approach) >= 4:
-        sf_slope_local = round(float(np.polyfit(np.log2(freqs[approach]+1), avg_db[approach], 1)[0]), 2)
+        sf_zone_trend = round(float(np.polyfit(np.log2(freqs[approach]+1), avg_db[approach], 1)[0]), 2)
     else:
-        sf_slope_local = slope
-    sf_slope_deviation = round(slope - sf_slope_local, 2)
+        sf_zone_trend = slope
+    # Retention = how much the SF zone resists the overall rolloff.
+    # Formula: sf_zone_trend - slope
+    #   sf_zone_trend SHALLOWER (less negative) than slope -> POSITIVE retention
+    #     = energy holding up in the SF band = bump/peak = good therapeutic signal
+    #   sf_zone_trend STEEPER (more negative) than slope -> NEGATIVE retention
+    #     = energy falling away faster than the rest = no bump
+    sf_retention = round(sf_zone_trend - slope, 2)
 
-    if   sf_slope_deviation >  3.5: sf_shape, sf_code = "Sharp concentrated peak", "sharp"
-    elif sf_slope_deviation >  1.2: sf_shape, sf_code = "Moderate focused peak",   "moderate"
-    elif sf_slope_deviation > -0.5: sf_shape, sf_code = "Broad plateau",           "plateau"
-    else:                           sf_shape, sf_code = "Below trend",             "below"
+    if   sf_retention >  3.5: sf_shape, sf_code = "Sharp concentrated peak", "sharp"
+    elif sf_retention >  1.2: sf_shape, sf_code = "Moderate focused peak",   "moderate"
+    elif sf_retention > -0.5: sf_shape, sf_code = "Broad plateau",           "plateau"
+    else:                     sf_shape, sf_code = "Below trend",             "below"
 
     def zone(flo, fhi, rlo=400, rhi=1500):
         zm = (freqs >= flo) & (freqs <= fhi)
@@ -256,7 +262,7 @@ def analyse(audio_bytes, filename, mode):
 
     pitch_iqr = float(np.percentile(voiced,75)-np.percentile(voiced,25)) if len(voiced)>4 else 30.0
 
-    log.info(f"Analysed {filename} | {mode} | F0={f0:.1f}Hz slope={slope} SF={sf_str}dB sfslope={sf_slope_local}")
+    log.info(f"Analysed {filename} | {mode} | F0={f0:.1f}Hz slope={slope} SF={sf_str}dB sf_trend={sf_zone_trend} retention={sf_retention}")
 
     return {
         "mode": mode, "duration": round(dur,1), "filename": filename,
@@ -268,8 +274,10 @@ def analyse(audio_bytes, filename, mode):
         "dominant_H": dom_h["H"], "dominant_hz": round(dom_h["hz"],1),
         "slope": slope,
         "sf_str": sf_str, "sf_hz": sf_hz, "sf_ltas": sf_ltas, "sf_gap": sf_gap,
-        "sf_slope_local": sf_slope_local,
-        "sf_slope_deviation": sf_slope_deviation,
+        "sf_zone_trend": sf_zone_trend,
+        "sf_retention": sf_retention,
+        "sf_slope_local": sf_zone_trend,      # legacy alias
+        "sf_slope_deviation": -sf_retention,  # legacy alias (old sign convention)
         "sf_shape": sf_shape, "sf_shape_code": sf_code,
         "low_max":   zone(80,   500,  200, 800),
         "mid_max":   zone(500,  2500, 400, 1500),
@@ -349,7 +357,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.6.2", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.7.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
