@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.7.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.7.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -206,7 +206,11 @@ def analyse(audio_bytes, filename, mode):
     sf_ltas = round(float(np.max(adb_full[sf_mask] - np.polyval(cr2, np.log2(sf_freqs)))), 1)
     sf_gap  = round(sf_str - sf_ltas, 1)
 
-    approach = (freqs >= 2000) & (freqs <= 4000)
+    # Center the retention window on the ACTUAL detected peak (sf_hz),
+    # not a fixed 2000-4000Hz span. A fixed wide span can straddle both
+    # the rising bump and a later steep falloff, which averages into
+    # a misleadingly steep line that masks a real, visible peak.
+    approach = (freqs >= sf_hz - 500) & (freqs <= sf_hz + 500)
     if np.sum(approach) >= 4:
         sf_zone_trend = round(float(np.polyfit(np.log2(freqs[approach]+1), avg_db[approach], 1)[0]), 2)
     else:
@@ -357,7 +361,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.7.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.7.1", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
