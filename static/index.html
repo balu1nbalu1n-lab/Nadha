@@ -376,7 +376,12 @@ function buildPrompt(m,ctx){
   var sfSlD=sfDev>2?'shallower than overall, resonance peak forming':sfDev>0.5?'moderately shallower, moderate peak':'following overall rolloff, broad activation';
   var sfD=sf>=20?'exceptional':sf>=15?'strong':sf>=10?'present':'developing';
   var gkD=gk>=5?'full Carnatic width':gk>=3?'wide expressive':gk>=1.5?'moderate':'minimal';
-  var L=['Voice for a '+(m.mode==='singer'?'singer':'speaker')+'. Context: '+(ctx||''),'',
+  var sigType=m.signal_type||'melody';
+  var sigNote=sigType==='drone'?'IMPORTANT: This recording is a SUSTAINED DRONE (single continuous pitch, e.g. shruti/tanpura), not melodic singing or speech. Gamaka and melodic movement metrics do not apply here — do not discuss ornamental movement. Focus only on tone quality, resonance (slope, SF zone), and harmonic richness of the sustained pitch.':
+    sigType==='speech'?'Note: This recording shows continuous pitch movement typical of natural speech prosody rather than held melodic notes.':
+    'This recording shows melodic pitch movement with distinct held notes (swaras), consistent with singing.';
+  var L=['Voice for a '+(m.mode==='singer'?'singer':'speaker')+'. Context: '+(ctx||''),
+    'Signal type detected: '+sigType+' (plateau fraction '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'%). '+sigNote,'',
     'F0: '+m.f0+' Hz ('+m.vtype+'). Duration: '+m.duration+'s. Dominant H'+(m.dominant_H||1),
     'Overall slope: '+m.slope+' dB/oct ('+sD+')',
     'SF zone slope 2000-4000 Hz: '+sfSl+' dB/oct ('+sfSlD+')',
@@ -384,8 +389,10 @@ function buildPrompt(m,ctx){
     'SF zone: '+sf+' dB above rolloff ('+sfD+')',
     'SF LTAS: '+m.sf_ltas+'. SF Gap: '+sfGd,
     'SF shape: '+m.sf_shape,'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics];
-  if(m.mode==='singer')L.push('Gamaka: '+m.gamaka+' st ('+gkD+'). Rate: '+m.gamaka_rate+' Hz');
-  else L.push('Pitch IQR: '+m.pitch_iqr+' Hz');
+  if(sigType!=='drone'){
+    if(m.mode==='singer')L.push('Gamaka: '+m.gamaka+' st ('+gkD+'). Rate: '+m.gamaka_rate+' Hz');
+    else L.push('Pitch IQR: '+m.pitch_iqr+' Hz');
+  }
   L.push('','Please provide the qualitative narrative assessment.');
   return L.join('\n');
 }
@@ -395,20 +402,32 @@ function showResult(m,assess,src,ctxL){
   ['g-hdr','g-mode','g-ctx','g-upsec','g-ancard'].forEach(hide);
   G('g-rav').textContent=m.mode==='singer'?'\u266a':'\u25ce';
   G('g-rvt').textContent=(m.vtype||'')+' \u00b7 '+(m.mode==='singer'?'Singer':'Speaker');
-  G('g-rct').textContent=(ctxL?ctxL.label:'')+' \u00b7 '+(ST.file?ST.file.name:'')+' \u00b7 '+m.duration+'s';
+  var sigType=m.signal_type||'melody';
+  var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like pitch':'Melodic';
+  G('g-rct').textContent=(ctxL?ctxL.label:'')+' \u00b7 '+(ST.file?ST.file.name:'')+' \u00b7 '+m.duration+'s \u00b7 '+sigLbl;
   G('g-assess').textContent=assess;
   G('g-mgrid').innerHTML=buildGrid(m);
   G('g-slope').innerHTML=renderSlope(m);
   G('g-zones').innerHTML=renderZones(m);
   var n=G('g-srcnote');
-  n.textContent=src==='python'?'\u2713 Precision analysis via Python/librosa pipeline.':'\u26a0 Browser-side analysis (backend unavailable). Metrics are consistent but approximate.';
+  var precisionNote=src==='python'?'\u2713 Precision analysis via Python/librosa pipeline.':'\u26a0 Browser-side analysis (backend unavailable). Metrics are consistent but approximate.';
+  if(sigType==='drone'){
+    n.textContent=precisionNote+' Note: detected as a sustained drone tone \u2014 gamaka and melodic metrics are not applicable and have been omitted.';
+  } else if(sigType==='speech' && m.mode==='singer'){
+    n.textContent=precisionNote+' Note: this recording shows speech-like pitch movement rather than held melodic notes \u2014 consider Speaker mode for more relevant feedback.';
+  } else {
+    n.textContent=precisionNote;
+  }
   show('g-res');
 }
 
 function buildGrid(m){
   var sl=parseFloat(m.slope),sfSl=parseFloat(m.sf_slope_local||sl),sfDev=parseFloat(m.sf_slope_deviation||0),sfGap=parseFloat(m.sf_gap||0),sf=parseFloat(m.sf_str||0);
   function slL(v){return v<-13?'Dark':v<-10?'Warm dark':v<-6?'Ideal':v<-3?'Bright':'Very bright';}
+  var sigType=m.signal_type||'melody';
+  var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like':'Melodic';
   var cells=[
+    {l:'Signal type',v:sigLbl,s:'plateau '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'%'},
     {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
     {l:'Overall slope',v:slL(sl),s:m.slope+' dB/oct'},
     {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:'+'+sf+' dB'},
@@ -416,8 +435,10 @@ function buildGrid(m){
     {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
     {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
   ];
-  if(m.mode==='singer')cells.push({l:'Gamaka',v:parseFloat(m.gamaka)>=5?'Wide Carnatic':parseFloat(m.gamaka)>=3?'Expressive':parseFloat(m.gamaka)>=1.5?'Moderate':'Minimal',s:m.gamaka+' st, '+m.gamaka_rate+' Hz'});
-  else cells.push({l:'Pitch range',v:parseFloat(m.pitch_iqr||30)>=80?'Wide':parseFloat(m.pitch_iqr||30)>=40?'Moderate':'Contained',s:'IQR '+m.pitch_iqr+' Hz'});
+  if(sigType!=='drone'){
+    if(m.mode==='singer')cells.push({l:'Gamaka',v:parseFloat(m.gamaka)>=5?'Wide Carnatic':parseFloat(m.gamaka)>=3?'Expressive':parseFloat(m.gamaka)>=1.5?'Moderate':'Minimal',s:m.gamaka+' st, '+m.gamaka_rate+' Hz'});
+    else cells.push({l:'Pitch range',v:parseFloat(m.pitch_iqr||30)>=80?'Wide':parseFloat(m.pitch_iqr||30)>=40?'Moderate':'Contained',s:'IQR '+m.pitch_iqr+' Hz'});
+  }
   cells.push({l:'H dominant',v:'H'+(m.dominant_H||1),s:m.n_harmonics+' harmonics'});
   return cells.map(function(c){return '<div class="mcell"><div class="mlbl">'+c.l+'</div><div class="mval">'+c.v+'</div>'+(c.s?'<div class="msub">'+c.s+'</div>':'')+'</div>';}).join('');
 }
@@ -486,7 +507,10 @@ function renderZones(m){
   z+=zRow('Presence zone (SF)','2500\u20133500 Hz',st,Math.max(5,Math.min(95,(sfM+2)*4.5)),'var(--c-sf)',st==='exceptional'||st==='strong'?sfTipStrong:st==='present'?sfTipPresent:sfTipDev,shT,shLbl,gapNote,sfDarker,sfBrighter);
   var ut=cz(up);
   z+=zRow('Upper register','3500\u20138000 Hz',ut,Math.max(3,Math.min(95,(up+18)*3.5)),'var(--c-up)',ut==='strong'||ut==='good'?'Upper register is bright and present \u2014 consonants are crisp and the voice has natural sparkle that sustains listener alertness.':'Upper register is developing. Open vowels on upper pitches with a completely open throat will progressively develop this zone.',null,null,null,'Allow the upper register to recede naturally in deepest passages.','Bright vowels ee and ay or fast tongue-tip articulation will open this zone progressively.');
-  if(m.mode==='singer'){
+  if(m.signal_type==='drone'){
+    z+='<div class="zone"><div class="zhdr"><span class="zname">Ornamental expression</span></div>'
+      +'<p class="ztip ok">Not applicable \u2014 this recording is a sustained drone tone with no melodic note movement. Gamaka and pitch-expressiveness metrics only apply to melodic singing or speech.</p></div>';
+  } else if(m.mode==='singer'){
     var gkt=cgk(gk);
     z+=zRow('Ornamental expression (gamaka)',gk+' st \u00b7 '+gkR+' Hz',gkt==='wide'?'strong':gkt==='expressive'?'good':gkt==='moderate'?'developing':'needs',Math.min(95,gk*14+10),'var(--c-gk)',gkt==='wide'?'Gamaka extent is at full Carnatic width \u2014 each ornament sweeps a wide arc that continuously activates the therapeutic SF zone.':gkt==='expressive'?'Good ornamental expression. There is room to widen each arc further toward full Carnatic extent.':gkt==='moderate'?'Gamaka extent is moderate. Widening through slow riyaz is the single most impactful development exercise.':'Begin with slow minda practice \u2014 a conscious slide between two adjacent swaras.',null,null,null,'Slow the gamaka rate while maintaining the full extent.','Increase gamaka rate while keeping the width for more forward energy.');
   }else{
