@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.9.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.9.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -253,6 +253,82 @@ def analyse(audio_bytes, filename, mode):
     elif sf_retention > -0.5: sf_shape, sf_code = "Broad plateau",           "plateau"
     else:                     sf_shape, sf_code = "Below trend",             "below"
 
+    # ---- Supplementary multi-window range for slope / SF strength / retention ----
+    # The values above (slope, sf_str, sf_hz, dom_h, sf_retention, sf_shape) are
+    # UNCHANGED and remain anchored to the single validated steady segment --
+    # we tried making the "best window" the representative value and reverted
+    # it after confirming it broke dominant-H (Kaapi's validated H2 became H1)
+    # by anchoring harmonics to an atypically loud but unrepresentative moment.
+    #
+    # This block ONLY adds _min/_max range context, sampled across several
+    # windows spread through the track (skipping a short lead-in), the same
+    # adaptive-sampling pattern already validated for gamaka. It never feeds
+    # back into the primary numbers above.
+    lead_in = min(3.0 * SR, max(0, len(y) - seg_len))
+    n_sf_windows = int(np.clip(round(dur / 15), 3, 8))
+    win_starts_sf = np.linspace(lead_in, max(lead_in, len(y) - seg_len), n_sf_windows).astype(int)
+
+    range_slopes, range_sf_strs, range_retentions = [], [], []
+    for ws in win_starts_sf:
+        seg_y = y[ws:ws + seg_len]
+        f0w = librosa.yin(seg_y, fmin=fmin, fmax=900, sr=SR)
+        voicedw = f0w[(f0w > fmin*0.9) & (f0w < 900)]
+        # Require at least 60% of the window to be voiced, not just a bare
+        # 20-frame minimum (which was only ~9% of a 5s window -- a window
+        # that's mostly a deliberate musical pause/silence with one brief
+        # sung note at the end could otherwise pass and get treated as a
+        # representative sample of the voice, skewing the reported range).
+        # Musical silence is real and valuable to the performance; we just
+        # don't want it sampled AS IF it were a typical vocal moment.
+        if len(voicedw) < 20 or (len(voicedw) / len(f0w)) < 0.60:
+            continue
+        f0_anchor = float(np.median(voicedw))
+        Dw = librosa.stft(seg_y, n_fft=N_FFT, hop_length=HOP)
+        adbw = librosa.amplitude_to_db(np.mean(np.abs(Dw), axis=1), ref=np.max)
+
+        harms_w = []
+        for n in range(1, int(min(freqs[-1], 9000) / max(f0_anchor, 1)) + 1):
+            exp = n * f0_anchor
+            if exp > freqs[-1]: break
+            tol = exp * 0.07
+            mask = (freqs >= exp - tol) & (freqs <= exp + tol)
+            if not np.any(mask): continue
+            idx = np.argmax(adbw[mask])
+            harms_w.append((float(freqs[mask][idx]), float(adbw[mask][idx])))
+        if len(harms_w) < 3:
+            continue
+        hfw = np.array([h[0] for h in harms_w])
+        haw = np.array([h[1] for h in harms_w])
+        slope_w = float(np.polyfit(np.log2(hfw), haw, 1)[0])
+
+        ref_w = (freqs >= 400) & (freqs <= 1500)
+        cr_w = np.polyfit(np.log2(freqs[ref_w]), adbw[ref_w], 1)
+        sf_mask_w = (freqs >= SF_LOW) & (freqs <= SF_HIGH)
+        sf_above_w = adbw[sf_mask_w] - np.polyval(cr_w, np.log2(freqs[sf_mask_w]))
+        sf_str_w = float(np.max(sf_above_w))
+        sf_hz_w = float(freqs[sf_mask_w][np.argmax(sf_above_w)])
+
+        approach_w = (freqs >= sf_hz_w - 500) & (freqs <= sf_hz_w + 500)
+        if np.sum(approach_w) >= 4:
+            trend_w = float(np.polyfit(np.log2(freqs[approach_w]+1), adbw[approach_w], 1)[0])
+        else:
+            trend_w = slope_w
+        retention_w = trend_w - slope_w
+
+        range_slopes.append(slope_w)
+        range_sf_strs.append(sf_str_w)
+        range_retentions.append(retention_w)
+
+    if range_slopes:
+        slope_min, slope_max = round(min(range_slopes), 2), round(max(range_slopes), 2)
+        sf_str_min, sf_str_max = round(min(range_sf_strs), 1), round(max(range_sf_strs), 1)
+        retention_min, retention_max = round(min(range_retentions), 2), round(max(range_retentions), 2)
+    else:
+        slope_min = slope_max = slope
+        sf_str_min = sf_str_max = sf_str
+        retention_min = retention_max = sf_retention
+    n_sf_windows_used = len(range_slopes)
+
     # Known limitation: the retention trend-fit assumes a smooth, continuous
     # spectral envelope around the peak. That assumption holds for sung melody
     # (formants smear harmonics into a continuous-looking bump) but breaks for
@@ -344,12 +420,16 @@ def analyse(audio_bytes, filename, mode):
     # moderate throughout, and a single segment-based number could not
     # distinguish those two cases.
     n_windows = int(np.clip(round(dur / 15), 3, 8))
-    win_starts = np.linspace(0, max(0, len(y) - seg_len), n_windows).astype(int)
+    lead_in_gk = min(3.0 * SR, max(0, len(y) - seg_len))
+    win_starts = np.linspace(lead_in_gk, max(lead_in_gk, len(y) - seg_len), n_windows).astype(int)
     extents, rates = [], []
     for ws in win_starts:
         f0_w = librosa.yin(y[ws:ws+seg_len], fmin=fmin, fmax=900, sr=SR)
         voiced_w = f0_w[(f0_w > fmin*0.9) & (f0_w < 900)]
-        if len(voiced_w) < 20:
+        # Same voiced-majority guard as the SF zone window sampling: a
+        # window that's mostly musical silence with one brief sung note
+        # should not be treated as a representative gamaka sample.
+        if len(voiced_w) < 20 or (len(voiced_w) / len(f0_w)) < 0.60:
             continue
         anchor = float(np.median(voiced_w))
         ext_w, rate_w = gamaka_in_window(voiced_w, anchor)
@@ -385,6 +465,10 @@ def analyse(audio_bytes, filename, mode):
         "sf_str": sf_str, "sf_hz": sf_hz, "sf_ltas": sf_ltas, "sf_gap": sf_gap,
         "sf_zone_trend": sf_zone_trend,
         "sf_retention": sf_retention,
+        "slope_min": slope_min, "slope_max": slope_max,
+        "sf_str_min": sf_str_min, "sf_str_max": sf_str_max,
+        "sf_retention_min": retention_min, "sf_retention_max": retention_max,
+        "n_sf_windows": n_sf_windows_used,
         "sf_slope_local": sf_zone_trend,      # legacy alias
         "sf_slope_deviation": -sf_retention,  # legacy alias (old sign convention)
         "sf_shape": sf_shape, "sf_shape_code": sf_code, "sf_shape_reliable": sf_shape_reliable,
@@ -468,7 +552,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.9.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.9.3", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
