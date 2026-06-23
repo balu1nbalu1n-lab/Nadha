@@ -388,10 +388,10 @@ function buildPrompt(m,ctx){
   L.push('Plateau fraction (pitch stability): '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'%. Pitch variability (robust CV): '+(m.robust_cv!=null?m.robust_cv.toFixed(4):'?')+' (near-zero = single sustained pitch; 0.3-0.5 = typical melodic movement)','',
     (sigType==='drone'?'Tone':'Voice')+' for a '+(m.mode==='singer'?'singer':'speaker')+' context. Context label: '+(ctx||''),
     'F0: '+m.f0+' Hz ('+m.vtype+'). Duration: '+m.duration+'s. Dominant H'+(m.dominant_H||1),
-    'Overall slope: '+m.slope+' dB/oct ('+sD+')',
+    'Overall slope: '+m.slope+' dB/oct ('+sD+')'+((m.slope_min!=null&&m.slope_max!=null)?(' -- sampled range across the track: '+m.slope_min+' to '+m.slope_max+' dB/oct. Mention if this voice shifts noticeably between darker and brighter passages.'):''),
     'SF zone retention 2000-4000 Hz: '+sfZT+' dB/oct local trend ('+sfRetD+')',
-    'SF zone retention score: '+sfRet+' dB (higher = more resonance held, peak forming)',
-    'SF zone: '+sf+' dB above rolloff ('+sfD+')',
+    'SF zone retention score: '+sfRet+' dB (higher = more resonance held, peak forming)'+((m.sf_retention_min!=null&&m.sf_retention_max!=null)?(' -- sampled range: '+m.sf_retention_min+' to '+m.sf_retention_max+' dB. This range is naturally wider than other ranges since it is a difference of two already-variable measurements; do not over-interpret a wide spread here as a flaw.'):''),
+    'SF zone: '+sf+' dB above rolloff ('+sfD+')'+((m.sf_str_min!=null&&m.sf_str_max!=null)?(' -- sampled range across the track: +'+m.sf_str_min+' to +'+m.sf_str_max+' dB. A wide range suggests the resonance is more present in some passages than others; mention this if relevant to the coaching guidance.'):''),
     'SF LTAS: '+m.sf_ltas+'. SF Gap: '+sfGd,
     'SF shape: '+m.sf_shape+(m.sf_shape_reliable===false?' (the standard shape-fit was inconclusive on this sparse-harmonic signal; classification instead relies on the directly-measured peak strength, which is robust here)':''),'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics);
   if(sigType!=='drone'){
@@ -440,9 +440,9 @@ function buildGrid(m){
   var cells=[
     {l:'Signal type',v:sigLbl,s:'plateau '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'% \u00b7 CV '+(m.robust_cv!=null?m.robust_cv.toFixed(4):'?')},
     {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
-    {l:'Overall slope',v:slL(sl),s:m.slope+' dB/oct'},
-    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:'+'+sf+' dB'},
-    {l:'SF zone retention',v:sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad/flat',s:sfRet+' dB'},
+    {l:'Overall slope',v:slL(sl),s:(m.slope_min!=null&&m.slope_max!=null)?(m.slope_min+'\u2013'+m.slope_max+' dB/oct range'):(m.slope+' dB/oct')},
+    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:(m.sf_str_min!=null&&m.sf_str_max!=null)?('+'+m.sf_str_min+' to +'+m.sf_str_max+' dB range'):('+'+sf+' dB')},
+    {l:'SF zone retention',v:sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad/flat',s:(m.sf_retention_min!=null&&m.sf_retention_max!=null)?(m.sf_retention_min+'\u2013'+m.sf_retention_max+' dB range'):(sfRet+' dB')},
     {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
     {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
   ];
