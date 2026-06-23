@@ -395,7 +395,13 @@ function buildPrompt(m,ctx){
     'SF LTAS: '+m.sf_ltas+'. SF Gap: '+sfGd,
     'SF shape: '+m.sf_shape+(m.sf_shape_reliable===false?' (the standard shape-fit was inconclusive on this sparse-harmonic signal; classification instead relies on the directly-measured peak strength, which is robust here)':''),'HNR: '+m.hnr+'. Harmonics: '+m.n_harmonics);
   if(sigType!=='drone'){
-    if(m.mode==='singer')L.push('Gamaka: '+m.gamaka+' st ('+gkD+'). Rate: '+m.gamaka_rate+' Hz');
+    if(m.mode==='singer'){
+      if(m.gamaka_min!=null && m.gamaka_max!=null){
+        L.push('Gamaka range across the recording: '+m.gamaka_min+' to '+m.gamaka_max+' semitones ('+gkD+' at the widest sampled point). Rate range: '+m.gamaka_rate_min+' to '+m.gamaka_rate_max+' Hz. This is sampled across multiple points in the track, not a single moment -- mention that the ornamentation varies in width across the performance if the range is wide.');
+      } else {
+        L.push('Gamaka: '+m.gamaka+' st ('+gkD+'). Rate: '+m.gamaka_rate+' Hz');
+      }
+    }
     else L.push('Pitch IQR: '+m.pitch_iqr+' Hz');
   }
   L.push('','Please provide the qualitative narrative assessment, following the structure that matches the SIGNAL TYPE stated above.');
@@ -441,7 +447,11 @@ function buildGrid(m){
     {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
   ];
   if(sigType!=='drone'){
-    if(m.mode==='singer')cells.push({l:'Gamaka',v:parseFloat(m.gamaka)>=5?'Wide Carnatic':parseFloat(m.gamaka)>=3?'Expressive':parseFloat(m.gamaka)>=1.5?'Moderate':'Minimal',s:m.gamaka+' st, '+m.gamaka_rate+' Hz'});
+    if(m.mode==='singer'){
+      var gkHasRange = m.gamaka_min!=null && m.gamaka_max!=null;
+      var gkMaxVal = gkHasRange ? parseFloat(m.gamaka_max) : parseFloat(m.gamaka);
+      cells.push({l:'Gamaka',v:gkMaxVal>=5?'Wide Carnatic':gkMaxVal>=3?'Expressive':gkMaxVal>=1.5?'Moderate':'Minimal',s:gkHasRange?(m.gamaka_min+'\u2013'+m.gamaka_max+' st range'):(m.gamaka+' st, '+m.gamaka_rate+' Hz')});
+    }
     else cells.push({l:'Pitch range',v:parseFloat(m.pitch_iqr||30)>=80?'Wide':parseFloat(m.pitch_iqr||30)>=40?'Moderate':'Contained',s:'IQR '+m.pitch_iqr+' Hz'});
   }
   cells.push({l:'H dominant',v:'H'+(m.dominant_H||1),s:m.n_harmonics+' harmonics'});
@@ -497,7 +507,11 @@ function zRow(name,freq,tier,pct,color,tip,shT,shLbl,gapNote,darker,brighter){
 
 function renderZones(m){
   _zi=0;
-  var sfS=parseFloat(m.sf_str||0),sfGap=parseFloat(m.sf_gap||0),lo=parseFloat(m.low_max||0),mi=parseFloat(m.mid_max||0),sfM=parseFloat(m.sf_max||sfS*.9),up=parseFloat(m.upper_max||0),gk=parseFloat(m.gamaka||0),gkR=parseFloat(m.gamaka_rate||0),pi=parseFloat(m.pitch_iqr||30);
+  var sfS=parseFloat(m.sf_str||0),sfGap=parseFloat(m.sf_gap||0),lo=parseFloat(m.low_max||0),mi=parseFloat(m.mid_max||0),sfM=parseFloat(m.sf_max||sfS*.9),up=parseFloat(m.upper_max||0),pi=parseFloat(m.pitch_iqr||30);
+  var gkHasRange=m.gamaka_min!=null && m.gamaka_max!=null;
+  var gk=gkHasRange?parseFloat(m.gamaka_max):parseFloat(m.gamaka||0);
+  var gkR=gkHasRange?parseFloat(m.gamaka_rate_max):parseFloat(m.gamaka_rate||0);
+  var gkLabel=gkHasRange?(m.gamaka_min+'\u2013'+m.gamaka_max+' st \u00b7 sampled across track'):(gk+' st \u00b7 '+gkR+' Hz');
   var shCode=m.sf_shape_code||'plateau',shLbl=m.sf_shape||'Broad plateau';
   var shT=shCode==='sharp'||shCode==='sparse_strong'?'strong':shCode==='moderate'?'good':'developing';
   var gapNote=m.mode==='singer'
@@ -522,7 +536,8 @@ function renderZones(m){
       +'<p class="ztip ok">Not applicable \u2014 this recording is a sustained drone tone with no melodic note movement. Gamaka and pitch-expressiveness metrics only apply to melodic singing or speech.</p></div>';
   } else if(m.mode==='singer'){
     var gkt=cgk(gk);
-    z+=zRow('Ornamental expression (gamaka)',gk+' st \u00b7 '+gkR+' Hz',gkt==='wide'?'strong':gkt==='expressive'?'good':gkt==='moderate'?'developing':'needs',Math.min(95,gk*14+10),'var(--c-gk)',gkt==='wide'?'Gamaka extent is at full Carnatic width \u2014 each ornament sweeps a wide arc that continuously activates the therapeutic SF zone.':gkt==='expressive'?'Good ornamental expression. There is room to widen each arc further toward full Carnatic extent.':gkt==='moderate'?'Gamaka extent is moderate. Widening through slow riyaz is the single most impactful development exercise.':'Begin with slow minda practice \u2014 a conscious slide between two adjacent swaras.',null,null,null,'Slow the gamaka rate while maintaining the full extent.','Increase gamaka rate while keeping the width for more forward energy.');
+    var gkRangeNote=gkHasRange?'Sampled at several points across the full recording, not a single moment \u2014 this shows how much the ornamentation widens and narrows through the performance.':null;
+    z+=zRow('Ornamental expression (gamaka)',gkLabel,gkt==='wide'?'strong':gkt==='expressive'?'good':gkt==='moderate'?'developing':'needs',Math.min(95,gk*14+10),'var(--c-gk)',gkt==='wide'?'Gamaka extent reaches full Carnatic width \u2014 each ornament sweeps a wide arc that continuously activates the therapeutic SF zone.':gkt==='expressive'?'Good ornamental expression. There is room to widen each arc further toward full Carnatic extent.':gkt==='moderate'?'Gamaka extent is moderate. Widening through slow riyaz is the single most impactful development exercise.':'Begin with slow minda practice \u2014 a conscious slide between two adjacent swaras.',null,null,gkRangeNote,'Slow the gamaka rate while maintaining the full extent.','Increase gamaka rate while keeping the width for more forward energy.');
   }else{
     var pt=cpi(pi);
     z+=zRow('Pitch expressiveness','prosodic variability',pt,Math.min(95,pi*0.7+10),'var(--c-pi)',pt==='strong'?'Wide pitch expressiveness is a natural asset \u2014 the voice moves freely and communicates emotional colour that keeps listeners genuinely engaged.':pt==='good'?'Good pitch variation. To expand further, practise telling stories rather than reading aloud \u2014 conversational mode naturally widens inflection.':'Pitch movement is contained. Identify three key phrases and deliberately raise pitch on the most important word in each. Record and compare.',null,null,null,'Use deliberate narrowing for quiet highest-impact moments.','Read a paragraph as if telling a story to a close friend. Allow the pitch to travel freely.');
