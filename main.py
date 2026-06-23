@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("nada")
 
-app = FastAPI(title="Nada Voice Analysis", version="4.8.0")
+app = FastAPI(title="Nada Voice Analysis", version="4.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -177,7 +177,7 @@ def analyse(audio_bytes, filename, mode):
     note = notes[int(round(midi)) % 12] + str(int(round(midi)) // 12 - 1)
 
     D_seg = librosa.stft(segment, n_fft=N_FFT, hop_length=HOP)
-    avg_db = librosa.amplitude_to_db(np.mean(np.abs(D_seg), axis=1), ref=np.max)
+    avg_db_seg = librosa.amplitude_to_db(np.mean(np.abs(D_seg), axis=1), ref=np.max)
     freqs = librosa.fft_frequencies(sr=SR, n_fft=N_FFT)
 
     D_full = librosa.stft(y, n_fft=N_FFT, hop_length=HOP)
@@ -187,6 +187,16 @@ def analyse(audio_bytes, filename, mode):
     vm = frms > -38
     vltas = librosa.amplitude_to_db(np.mean(mag_full[:, vm], axis=1), ref=np.max) if np.any(vm) else adb_full
     vfrac = float(np.mean(vm))
+
+    # Slope, harmonics, dominant-H, and SF zone strength all stay
+    # SEGMENT-based (avg_db_seg) -- confirmed via direct testing that a
+    # full-track average spectrum does not have a stable, well-defined
+    # slope or SF peak for a melodic recording (the average blends many
+    # different notes/vowels, and on duets, two singers). Tested moving
+    # these to full-track and found dominant-H changed incorrectly
+    # (Kaapi: validated H2 became H4) and slope/SF-strength became MORE
+    # sensitive to arbitrary reference-band choice, not less. Reverted.
+    avg_db = avg_db_seg
 
     harmonics = []
     for n in range(1, int(min(freqs[-1], 9000) / max(f0, 1)) + 1):
@@ -282,20 +292,82 @@ def analyse(audio_bytes, filename, mode):
     hnr = round(float(np.mean(hnr_v)) if hnr_v else 0.0, 2)
 
     fr_rate = SR / HOP
-    vib_rate = extent_st = 0.0
-    if len(voiced_sg) > 20:
-        wl = min(11, (len(voiced_sg)//2)*2-1)
-        if wl >= 3:
-            sm = savgol_filter(voiced_sg, wl, 2)
-            ff = np.abs(np.fft.rfft(sm - np.mean(sm)))
-            fq = np.fft.rfftfreq(len(sm), d=1.0/fr_rate)
-            vm2 = (fq >= 3) & (fq <= 12)
-            if np.any(vm2):
-                vib_rate = float(fq[vm2][np.argmax(ff[vm2])])
-                det = voiced_sg - uniform_filter1d(voiced_sg, size=max(1, int(fr_rate)))
-                ext_hz = float(np.std(det)) * 2
-                if f0 > ext_hz/2:
-                    extent_st = float(12 * np.log2((f0+ext_hz/2)/(f0-ext_hz/2)))
+
+    def gamaka_in_window(f0_window, anchor_f0):
+        """Same extent/rate logic as the original single-segment version,
+        with one addition: reject octave-jump outlier frames first using
+        a robust median-based filter. The original 'pick the steadiest
+        window' approach avoided this problem by construction (it only
+        ever looked at the one window least likely to contain glitches);
+        sampling multiple windows across the track removes that built-in
+        protection, so each window needs its own guard against YIN
+        occasionally locking onto the wrong octave for a few frames --
+        the same failure mode we confirmed on real drone recordings
+        earlier in this session (B.m4a tracked correctly only ~49% of
+        the time despite being a genuinely steady tone)."""
+        vib_rate_w = extent_st_w = 0.0
+        med = np.median(f0_window)
+        # Reject frames more than one octave from the window's median --
+        # real gamaka sweeps are at most a few semitones, never an octave.
+        clean = f0_window[(f0_window > med/1.8) & (f0_window < med*1.8)]
+        if len(clean) > 20 and len(clean) >= len(f0_window) * 0.7:
+            wl = min(11, (len(clean)//2)*2-1)
+            if wl >= 3:
+                sm = savgol_filter(clean, wl, 2)
+                ff = np.abs(np.fft.rfft(sm - np.mean(sm)))
+                fq = np.fft.rfftfreq(len(sm), d=1.0/fr_rate)
+                vm2 = (fq >= 3) & (fq <= 12)
+                if np.any(vm2):
+                    vib_rate_w = float(fq[vm2][np.argmax(ff[vm2])])
+                    det = clean - uniform_filter1d(clean, size=max(1, int(fr_rate)))
+                    ext_hz = float(np.std(det)) * 2
+                    if anchor_f0 > ext_hz/2:
+                        extent_st_w = float(12 * np.log2((anchor_f0+ext_hz/2)/(anchor_f0-ext_hz/2)))
+        return extent_st_w, vib_rate_w
+
+    # Gamaka extent/rate, MIN-MAX ACROSS THE TRACK:
+    #
+    # The original approach measured gamaka on the SAME 5-second window
+    # chosen for having the LEAST pitch variance -- i.e. specifically
+    # measuring ornamental movement at the moment picked for having the
+    # least movement. That's not a small sampling quirk, it's internally
+    # contradictory, and it meant a singer's most expressive gamaka
+    # elsewhere in the performance was invisible to the number reported.
+    #
+    # Fix: sample several 5-second windows spread evenly across the WHOLE
+    # track (adaptive count: roughly one window per 15s of audio, capped
+    # 3-8 windows so very short or very long recordings both get sensible
+    # coverage), measure gamaka in each, and report the full MIN-MAX RANGE
+    # rather than a single number from one arbitrary window. The range
+    # itself is informative: a singer who is calm in places and highly
+    # ornamented in others looks different from one who is uniformly
+    # moderate throughout, and a single segment-based number could not
+    # distinguish those two cases.
+    n_windows = int(np.clip(round(dur / 15), 3, 8))
+    win_starts = np.linspace(0, max(0, len(y) - seg_len), n_windows).astype(int)
+    extents, rates = [], []
+    for ws in win_starts:
+        f0_w = librosa.yin(y[ws:ws+seg_len], fmin=fmin, fmax=900, sr=SR)
+        voiced_w = f0_w[(f0_w > fmin*0.9) & (f0_w < 900)]
+        if len(voiced_w) < 20:
+            continue
+        anchor = float(np.median(voiced_w))
+        ext_w, rate_w = gamaka_in_window(voiced_w, anchor)
+        if ext_w > 0:
+            extents.append(ext_w)
+            rates.append(rate_w)
+
+    if extents:
+        gamaka_min, gamaka_max = round(min(extents), 2), round(max(extents), 2)
+        gamaka_rate_min, gamaka_rate_max = round(min(rates), 2), round(max(rates), 2)
+        # Keep a single representative figure (the max -- the singer's most
+        # expressive sampled moment) for any code path that still wants one
+        # number, e.g. the existing classification thresholds.
+        max_idx = int(np.argmax(extents))
+        extent_st, vib_rate = extents[max_idx], rates[max_idx]
+    else:
+        gamaka_min = gamaka_max = gamaka_rate_min = gamaka_rate_max = 0.0
+        extent_st = vib_rate = 0.0
 
     pitch_iqr = float(np.percentile(voiced,75)-np.percentile(voiced,25)) if len(voiced)>4 else 30.0
 
@@ -322,6 +394,8 @@ def analyse(audio_bytes, filename, mode):
         "upper_max": zone(3500, 8000, 800, 2500),
         "hnr": hnr, "vfrac": round(vfrac,3),
         "gamaka": round(extent_st,2), "gamaka_rate": round(vib_rate,2),
+        "gamaka_min": gamaka_min, "gamaka_max": gamaka_max,
+        "gamaka_rate_min": gamaka_rate_min, "gamaka_rate_max": gamaka_rate_max,
         "pitch_iqr": round(pitch_iqr,1),
     }
 
@@ -394,7 +468,7 @@ async def narrative_endpoint(request: Request):
 @app.get("/api/health")
 async def health():
     key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    return {"status": "ok", "version": "4.8.0", "api_key_configured": key_set}
+    return {"status": "ok", "version": "4.9.0", "api_key_configured": key_set}
 
 
 # ── SERVE FRONTEND ────────────────────────────────────────────
