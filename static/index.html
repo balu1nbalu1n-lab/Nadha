@@ -472,18 +472,58 @@ function renderSlope(m){
   var sfCol=sfCode==='sharp'?'var(--grn)':sfCode==='moderate'?'var(--blu)':sfCode==='sparse_strong'?'var(--grn)':'var(--amb)';
   var sfDB=sfCode==='sharp'||sfCode==='sparse_strong'?'bs':sfCode==='moderate'?'bg':'bd';
   var isUnreliable=m.sf_shape_reliable===false;
-  var noteText=isUnreliable
-    ? 'Sparse, sharply isolated harmonics (typical of a drone) made the usual shape-fit inconclusive \u2014 classification instead relies on the directly measured peak strength ('+(m.sf_str!=null?'+'+m.sf_str+' dB':'')+' above rolloff), which stays reliable on this kind of signal.'
-    : (sfRet>2?'SF zone resisting rolloff \u2014 focused resonance peak':sfRet>0.5?'Moderate peak forming \u2014 resonance concentrating':'Following overall rolloff \u2014 broad/diffuse activation');
+
+  // -- Range-aware data: how much did slope and SF retention actually move
+  // across the whole track, not just in the one steadiest window? --
+  var slMin=m.slope_min!=null?parseFloat(m.slope_min):sl, slMax=m.slope_max!=null?parseFloat(m.slope_max):sl;
+  var slSpread=Math.abs(slMax-slMin);
+  var retMin=m.sf_retention_min!=null?parseFloat(m.sf_retention_min):sfRet, retMax=m.sf_retention_max!=null?parseFloat(m.sf_retention_max):sfRet;
+  var retSpread=retMax-retMin;
+  var nWin=m.n_sf_windows||0;
+
+  // -- Slope: plain-language read of how steady the tonal colour stayed --
+  var slopeNote;
+  if(nWin<2){
+    slopeNote='Measured on a single steady window \u2014 not enough of the track sampled for a reliable range.';
+  } else if(slSpread<2){
+    slopeNote='Very steady \u2014 tonal colour barely shifts across the performance ('+slMin+' to '+slMax+' dB/oct).';
+  } else if(slSpread<5){
+    slopeNote='Some natural movement between phrases ('+slMin+' to '+slMax+' dB/oct) \u2014 normal as register and dynamics shift.';
+  } else {
+    slopeNote='Wide swing across the track ('+slMin+' to '+slMax+' dB/oct) \u2014 tonal colour shifts noticeably between sections; check whether this tracks deliberate dynamic/register changes or inconsistent breath support.';
+  }
+
+  // -- SF retention: explain the headline number, then give an actionable
+  // read of the range rather than just restating it. --
+  var headlineNote=isUnreliable
+    ? 'Sparse, sharply isolated harmonics (typical of a drone) made the usual shape-fit inconclusive on the steadiest window \u2014 the badge instead reflects the directly measured peak strength ('+(m.sf_str!=null?'+'+m.sf_str+' dB':'')+' above rolloff), which stays reliable on this kind of signal.'
+    : 'On the single steadiest moment in the recording, the SF zone is '+(sfRet>2?'resisting rolloff and forming a focused resonance peak.':sfRet>0.5?'forming a moderate, partially-focused peak.':'following the overall rolloff \u2014 broad, diffuse activation rather than a peak.');
+
+  var rangeNote;
+  if(nWin<2){
+    rangeNote='Only one usable window was found, so no across-track range is available.';
+  } else if(retSpread<3){
+    rangeNote='This holds consistently across the performance ('+retMin+' to '+retMax+' dB) \u2014 the resonance peak is reliably present, not a one-off moment.';
+  } else if(retMin<-0.5 && retMax>1.2){
+    rangeNote='But it is inconsistent across the rest of the performance ('+retMin+' to '+retMax+' dB) \u2014 the peak sharpens on some phrases and flattens on others. This is common in melodically active singing (gamaka, register shifts) and is not a flaw to fix by itself; for more even resonance, work on sustaining forward placement through transitions and not just on held notes.';
+  } else if(retMin<-0.5){
+    rangeNote='Across the rest of the performance it drops well below this peak ('+retMin+' to '+retMax+' dB) \u2014 the SF zone is only sharply focused in isolated moments. Forward-placement exercises sustained through full phrases, not just on strong notes, would help broaden where this peak appears.';
+  } else {
+    rangeNote='It stays in strong territory throughout ('+retMin+' to '+retMax+' dB) \u2014 a genuinely consistent resonance peak, not just a single good moment.';
+  }
+
   return '<div style="margin-bottom:1.25rem">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><span style="font-size:.875rem;font-weight:600;color:var(--tx)">Spectral slope (overall)</span><span class="bdg '+tier+'">'+lbl+'</span></div>'
     +'<div class="sgrad">'+(isIdeal?'<div class="sideal"></div>':'')+'<div class="scur" style="left:'+pos+'%"></div></div>'
     +'<div class="sends"><span>\u2190 Dark / grounding</span><span>Bright / forward \u2192</span></div>'
-    +'<div class="sfrow"><div style="flex:0 0 auto"><div style="font-size:.68rem;font-weight:600;color:var(--tx-m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">SF zone retention (2000\u20134000 Hz)</div>'
+    +'<div style="font-size:.7rem;color:var(--tx-m);margin-top:6px;line-height:1.4">'+slopeNote+'</div>'
+    +'<div class="sfrow" style="margin-top:14px"><div style="flex:0 0 auto"><div style="font-size:.68rem;font-weight:600;color:var(--tx-m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">SF zone retention (local trend near peak)</div>'
     +'<div style="display:flex;align-items:center;gap:6px"><span class="bdg '+sfDB+'">'+sfLbl+'</span><span style="font-size:.7rem;color:var(--tx-m)">'+sfRet+' dB</span></div></div>'
     +'<div style="flex:1;margin-left:12px"><div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--tx-m);margin-bottom:4px"><span>Broad</span><span>Sharp peak</span></div>'
-    +'<div class="sfmini"><div style="height:100%;width:'+sfPct+'%;background:'+sfCol+';border-radius:3px"></div></div>'
-    +'<div style="font-size:.68rem;color:var(--tx-m);margin-top:3px">'+noteText+'</div></div></div></div>';
+    +'<div class="sfmini"><div style="height:100%;width:'+sfPct+'%;background:'+sfCol+';border-radius:3px"></div></div></div></div>'
+    +'<div style="font-size:.7rem;color:var(--tx-m);margin-top:8px;line-height:1.4">'+headlineNote+'</div>'
+    +'<div style="font-size:.7rem;color:var(--tx-s);margin-top:6px;line-height:1.4;padding-top:8px;border-top:1px solid var(--brd)">'+rangeNote+'</div>'
+    +'</div>';
 }
 
 var _zi=0;
