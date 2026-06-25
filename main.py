@@ -321,12 +321,20 @@ def analyse(audio_bytes, filename, mode):
 
     if range_slopes:
         slope_min, slope_max = round(min(range_slopes), 2), round(max(range_slopes), 2)
+        slope_mean = round(float(np.mean(range_slopes)), 2)
         sf_str_min, sf_str_max = round(min(range_sf_strs), 1), round(max(range_sf_strs), 1)
+        sf_str_mean = round(float(np.mean(range_sf_strs)), 1)
         retention_min, retention_max = round(min(range_retentions), 2), round(max(range_retentions), 2)
+        # Mean, not just min/max -- a single high or low window among 5-8
+        # samples can otherwise read as "typical" when it's actually an
+        # outlier. The mean shows which side of the range the performance
+        # actually leans toward, so a headline number near one edge of the
+        # range can be flagged as atypical rather than representative.
+        retention_mean = round(float(np.mean(range_retentions)), 2)
     else:
-        slope_min = slope_max = slope
-        sf_str_min = sf_str_max = sf_str
-        retention_min = retention_max = sf_retention
+        slope_min = slope_max = slope_mean = slope
+        sf_str_min = sf_str_max = sf_str_mean = sf_str
+        retention_min = retention_max = retention_mean = sf_retention
     n_sf_windows_used = len(range_slopes)
 
     # Known limitation: the retention trend-fit assumes a smooth, continuous
@@ -465,9 +473,9 @@ def analyse(audio_bytes, filename, mode):
         "sf_str": sf_str, "sf_hz": sf_hz, "sf_ltas": sf_ltas, "sf_gap": sf_gap,
         "sf_zone_trend": sf_zone_trend,
         "sf_retention": sf_retention,
-        "slope_min": slope_min, "slope_max": slope_max,
-        "sf_str_min": sf_str_min, "sf_str_max": sf_str_max,
-        "sf_retention_min": retention_min, "sf_retention_max": retention_max,
+        "slope_min": slope_min, "slope_max": slope_max, "slope_mean": slope_mean,
+        "sf_str_min": sf_str_min, "sf_str_max": sf_str_max, "sf_str_mean": sf_str_mean,
+        "sf_retention_min": retention_min, "sf_retention_max": retention_max, "sf_retention_mean": retention_mean,
         "n_sf_windows": n_sf_windows_used,
         "sf_slope_local": sf_zone_trend,      # legacy alias
         "sf_slope_deviation": -sf_retention,  # legacy alias (old sign convention)
