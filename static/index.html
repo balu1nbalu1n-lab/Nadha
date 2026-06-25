@@ -462,7 +462,7 @@ function buildPrimaryGrid(m){
     {l:'Signal type',v:sigLbl,s:'plateau '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'% \u00b7 CV '+(m.robust_cv!=null?m.robust_cv.toFixed(4):'?')},
     {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
     {l:'Overall slope',v:slL(sl),s:(m.slope_min!=null&&m.slope_max!=null)?(m.slope_min+'\u2013'+m.slope_max+' dB/oct range'):(m.slope+' dB/oct')},
-    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:(m.sf_str_min!=null&&m.sf_str_max!=null)?('+'+m.sf_str_min+' to +'+m.sf_str_max+' dB range'):('+'+sf+' dB')}
+    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:(m.sf_str_min!=null&&m.sf_str_max!=null)?('+'+m.sf_str_min+' to +'+m.sf_str_max+' dB range'+(m.sf_str_mean!=null?(', avg +'+m.sf_str_mean+' dB'):'')):('+'+sf+' dB')}
   ];
   if(sigType!=='drone'){
     if(m.mode==='singer'){
@@ -483,9 +483,8 @@ function buildBackgroundGrid(m){
   // in testing tracked the singer's deliberate expressive choices and
   // measurement noise more than voice quality itself. Kept visible for
   // anyone who wants the full picture, not surfaced as headline feedback.
-  var sl=parseFloat(m.slope),sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0),sfGap=parseFloat(m.sf_gap||0);
+  var sfGap=parseFloat(m.sf_gap||0);
   var cells=[
-    {l:'SF zone retention',v:sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad/flat',s:(m.sf_retention_min!=null&&m.sf_retention_max!=null)?(m.sf_retention_min+'\u2013'+m.sf_retention_max+' dB range'):(sfRet+' dB')},
     {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
     {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
   ];
