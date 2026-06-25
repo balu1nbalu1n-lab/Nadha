@@ -82,6 +82,16 @@ body{background:var(--bg);color:var(--tx);font-family:var(--ff);font-size:15px;l
 .dln{font-size:.75rem;color:var(--tx-s);line-height:1.55;margin-bottom:4px}
 .assess{font-family:var(--fs);font-size:1.1rem;line-height:1.95;color:var(--tx-s);font-style:italic}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:1rem}
+.bgpanel{margin-bottom:1rem}
+.bgpanel summary{font-size:.72rem;color:var(--tx-m);cursor:pointer;list-style:none;display:flex;align-items:center;gap:5px;padding:4px 0;user-select:none}
+.bgpanel summary::before{content:'\\25b8';display:inline-block;font-size:.65rem;transition:transform .15s}
+.bgpanel[open] summary::before{transform:rotate(90deg)}
+.bgpanel summary::-webkit-details-marker{display:none}
+.bgmgrid .mcell{background:var(--bg-s);border:1px solid var(--brd);opacity:.72;padding:.5rem .7rem}
+.bgmgrid .mlbl{font-size:.6rem}
+.bgmgrid .mval{font-size:.78rem;font-weight:500;color:var(--tx-s)}
+.bgmgrid .msub{font-size:.62rem}
+.bgnote{font-size:.66rem;color:var(--tx-m);margin-top:6px;line-height:1.4;font-style:italic}
 .mcell{background:var(--bg-s);border:1px solid var(--brd);border-radius:10px;padding:.625rem .875rem}
 .mlbl{font-size:.65rem;font-weight:500;color:var(--tx-m);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
 .mval{font-size:.88rem;font-weight:600;color:var(--tx)}
@@ -181,6 +191,11 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:1rem 0}
     </div>
   </div>
   <div class="mgrid" id="g-mgrid"></div>
+  <details class="bgpanel" id="g-bgpanel">
+    <summary>More detail (background metrics)</summary>
+    <div class="mgrid bgmgrid" id="g-bggrid" style="margin-top:8px"></div>
+    <p class="bgnote" id="g-bgnote"></p>
+  </details>
   <div class="card"><div class="sec">Assessment</div><p class="assess" id="g-assess"></p></div>
   <div class="card">
     <div class="sec">Spectral regions of interest</div>
@@ -213,7 +228,7 @@ var SPEAKER_CTX=[
   {id:'broadcast',label:'Professional / broadcast',sub:'Podcast, voiceover, media'}
 ];
 
-var SYS='You are Nada, an expert voice analyst with deep knowledge of acoustic science, Carnatic music, voice therapy and communication coaching.\n\nWrite a SINGLE flowing narrative of 3-4 paragraphs. No bullet points, no headers, no raw numbers. Write warmly in second person. 250-320 words.\n\nThe prompt will tell you the detected SIGNAL TYPE. Follow the matching structure below exactly:\n\nIF SIGNAL TYPE IS MELODY OR SPEECH (a developing voice being coached):\n1. Open with the most distinctive positive quality of this voice\n2. Describe what the voice feels like to a listener\n3. Address the area with most growth potential - frame as invitation not criticism\n4. Close with one specific actionable practice suggestion for the SINGER OR SPEAKER\n\nIF SIGNAL TYPE IS DRONE (a sustained instrument or vocal drone tone, e.g. shruti box, tanpura, or a held vocal pitch with no melodic movement):\nThis is NOT a developing voice being coached. Do NOT use coaching language, do NOT suggest vocal practice exercises, do NOT say "your voice has untapped potential" or similar growth-framing. Instead:\n1. Open by describing the acoustic character of this sustained tone - its tonal color, richness, and resonance quality, as you would describe an instrument or a sound object\n2. Describe what listening to this drone feels like - its atmosphere, weight, and effect on a space or a listener\'s state\n3. Note any acoustic characteristic objectively (e.g. how broadly or narrowly the harmonic energy is distributed) without framing it as something to "improve" - frame it simply as a descriptive observation\n4. Close by describing the drone\'s suitability for its likely use (meditation anchor, raga tonic reference, ambient grounding) rather than a practice exercise\nNever mention gamaka, vocal training, or practice suggestions for a drone. Never call it "your voice" being coached - refer to it as "this tone" or "this drone."\n\nACOUSTIC GUIDE:\nOverall slope dB/oct: -14 to -18=very dark; -10 to -14=warm/settled; -6 to -10=ideal balanced; -3 to -6=bright/forward\nSF zone: under 5=developing; 5-10=emerging; 10-15=present; 15-20=strong; over 20=exceptional\nSF zone retention: positive retention means the SF zone trend is shallower than overall, meaning SF zone resists rolloff, meaning resonance peak forming. Negative retention means SF zone falls away faster than the rest of the voice, meaning no peak, broad/flat activation\nSF Gap (singers only): negative means voice peaks in movement (advanced Carnatic); 0-2=excellent; 2-5=good; over 5=variable\nSF Gap (speakers): negative or near zero means highly consistent presence across speech; higher means variable\nGamaka semitones (SINGERS ONLY - do not mention for speakers or drones): under 1.5=minimal; 1.5-3=moderate; 3-5=expressive; over 5=full Carnatic\nFor SPEAKER mode: focus on clarity, projection, resonance consistency, pitch expressiveness. Never mention gamaka for speakers.\nNever say dB values. Translate everything to experiential language.';
+var SYS='You are Nada, an expert voice analyst with deep knowledge of acoustic science, Carnatic music, voice therapy and communication coaching.\n\nWrite a SINGLE flowing narrative of 3-4 paragraphs. No bullet points, no headers, no raw numbers. Write warmly in second person. 250-320 words.\n\nPRIMARY METRICS (build the narrative around these \u2014 they track perceived voice quality directly and consistently across melody, drone and speech): signal type, fundamental/dominant harmonic/harmonic count, overall spectral slope, SF zone strength, and (for melody) gamaka extent.\n\nBACKGROUND METRICS (SF zone retention, SF Gap/consistency, HNR/vocal clarity): these are SECONDARY context only. They mostly reflect the performer\'s deliberate moment-to-moment choices (how much they vary emphasis, how steady a passage is) and measurement noise, not overall voice quality. Do NOT build the narrative\'s core praise or the growth-area suggestion around these. You may mention one of them briefly, in passing, only if it adds real colour \u2014 never as the headline observation and never as the actionable practice suggestion.\n\nThe prompt will tell you the detected SIGNAL TYPE. Follow the matching structure below exactly:\n\nIF SIGNAL TYPE IS MELODY OR SPEECH (a developing voice being coached):\n1. Open with the most distinctive positive quality of this voice, drawn from the PRIMARY METRICS\n2. Describe what the voice feels like to a listener\n3. Address the area with most growth potential, drawn from the PRIMARY METRICS - frame as invitation not criticism\n4. Close with one specific actionable practice suggestion for the SINGER OR SPEAKER, tied to a PRIMARY METRIC\n\nIF SIGNAL TYPE IS DRONE (a sustained instrument or vocal drone tone, e.g. shruti box, tanpura, or a held vocal pitch with no melodic movement):\nThis is NOT a developing voice being coached. Do NOT use coaching language, do NOT suggest vocal practice exercises, do NOT say "your voice has untapped potential" or similar growth-framing. Instead:\n1. Open by describing the acoustic character of this sustained tone - its tonal color, richness, and resonance quality, as you would describe an instrument or a sound object\n2. Describe what listening to this drone feels like - its atmosphere, weight, and effect on a space or a listener\'s state\n3. Note any acoustic characteristic objectively (e.g. how broadly or narrowly the harmonic energy is distributed) without framing it as something to "improve" - frame it simply as a descriptive observation\n4. Close by describing the drone\'s suitability for its likely use (meditation anchor, raga tonic reference, ambient grounding) rather than a practice exercise\nNever mention gamaka, vocal training, or practice suggestions for a drone. Never call it "your voice" being coached - refer to it as "this tone" or "this drone."\n\nACOUSTIC GUIDE:\nOverall slope dB/oct: -14 to -18=very dark; -10 to -14=warm/settled; -6 to -10=ideal balanced; -3 to -6=bright/forward\nSF zone: under 5=developing; 5-10=emerging; 10-15=present; 15-20=strong; over 20=exceptional\nSF zone retention (background only): positive retention means the SF zone trend is shallower than overall, meaning SF zone resists rolloff, meaning resonance peak forming. Negative retention means SF zone falls away faster than the rest of the voice, meaning no peak, broad/flat activation\nSF Gap (background only, singers): negative means voice peaks in movement (advanced Carnatic); 0-2=excellent; 2-5=good; over 5=variable\nSF Gap (background only, speakers): negative or near zero means highly consistent presence across speech; higher means variable\nGamaka semitones (PRIMARY for singers - do not mention for speakers or drones): under 1.5=minimal; 1.5-3=moderate; 3-5=expressive; over 5=full Carnatic\nFor SPEAKER mode: build the narrative around the PRIMARY METRICS (slope, SF zone, harmonics) the same as for singers. HNR/clarity and SF Gap/consistency are background only here too, not the main focus.\nNever say dB values. Translate everything to experiential language.';
 
 var ST={mode:null,ctx:null,file:null,busy:false};
 
@@ -417,7 +432,9 @@ function showResult(m,assess,src,ctxL){
   var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like pitch':'Melodic';
   G('g-rct').textContent=(ctxL?ctxL.label:'')+' \u00b7 '+(ST.file?ST.file.name:'')+' \u00b7 '+m.duration+'s \u00b7 '+sigLbl;
   G('g-assess').textContent=assess;
-  G('g-mgrid').innerHTML=buildGrid(m);
+  G('g-mgrid').innerHTML=buildPrimaryGrid(m);
+  G('g-bggrid').innerHTML=buildBackgroundGrid(m);
+  G('g-bgnote').textContent='These track the singer\'s expressive choices in the moment (how much emphasis varies, how steady the tone is) more than overall voice quality \u2014 useful context, not headline feedback.';
   G('g-slope').innerHTML=renderSlope(m);
   G('g-zones').innerHTML=renderZones(m);
   var n=G('g-srcnote');
@@ -432,19 +449,20 @@ function showResult(m,assess,src,ctxL){
   show('g-res');
 }
 
-function buildGrid(m){
-  var sl=parseFloat(m.slope),sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0),sfGap=parseFloat(m.sf_gap||0),sf=parseFloat(m.sf_str||0);
+function buildPrimaryGrid(m){
+  var sl=parseFloat(m.slope),sf=parseFloat(m.sf_str||0);
   function slL(v){return v<-13?'Dark':v<-10?'Warm dark':v<-6?'Ideal':v<-3?'Bright':'Very bright';}
   var sigType=m.signal_type||'melody';
   var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like':'Melodic';
+  // Primary set, kept deliberately small: these are the metrics found to
+  // track listener-perceived quality directly and consistently across
+  // melody, drone and speech -- each a first-order measurement rather than
+  // a derived comparison of two other measurements already shown here.
   var cells=[
     {l:'Signal type',v:sigLbl,s:'plateau '+(m.plateau_fraction!=null?(m.plateau_fraction*100).toFixed(0):'?')+'% \u00b7 CV '+(m.robust_cv!=null?m.robust_cv.toFixed(4):'?')},
     {l:'Fundamental',v:m.f0+' Hz',s:m.vtype},
     {l:'Overall slope',v:slL(sl),s:(m.slope_min!=null&&m.slope_max!=null)?(m.slope_min+'\u2013'+m.slope_max+' dB/oct range'):(m.slope+' dB/oct')},
-    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:(m.sf_str_min!=null&&m.sf_str_max!=null)?('+'+m.sf_str_min+' to +'+m.sf_str_max+' dB range'):('+'+sf+' dB')},
-    {l:'SF zone retention',v:sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad/flat',s:(m.sf_retention_min!=null&&m.sf_retention_max!=null)?(m.sf_retention_min+'\u2013'+m.sf_retention_max+' dB range'):(sfRet+' dB')},
-    {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
-    {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
+    {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:(m.sf_str_min!=null&&m.sf_str_max!=null)?('+'+m.sf_str_min+' to +'+m.sf_str_max+' dB range'):('+'+sf+' dB')}
   ];
   if(sigType!=='drone'){
     if(m.mode==='singer'){
@@ -455,6 +473,22 @@ function buildGrid(m){
     else cells.push({l:'Pitch range',v:parseFloat(m.pitch_iqr||30)>=80?'Wide':parseFloat(m.pitch_iqr||30)>=40?'Moderate':'Contained',s:'IQR '+m.pitch_iqr+' Hz'});
   }
   cells.push({l:'H dominant',v:'H'+(m.dominant_H||1),s:m.n_harmonics+' harmonics'});
+  return cells.map(function(c){return '<div class="mcell"><div class="mlbl">'+c.l+'</div><div class="mval">'+c.v+'</div>'+(c.s?'<div class="msub">'+c.s+'</div>':'')+'</div>';}).join('');
+}
+
+function buildBackgroundGrid(m){
+  // De-emphasised by design, for all signal types (melody, drone, speech).
+  // Each of these is a *derived comparison* of metrics already shown above
+  // (retention vs. slope, gap vs. single-note SF, HNR vs. periodicity) and
+  // in testing tracked the singer's deliberate expressive choices and
+  // measurement noise more than voice quality itself. Kept visible for
+  // anyone who wants the full picture, not surfaced as headline feedback.
+  var sl=parseFloat(m.slope),sfZT=parseFloat(m.sf_zone_trend!=null?m.sf_zone_trend:sl),sfRet=parseFloat(m.sf_retention!=null?m.sf_retention:0),sfGap=parseFloat(m.sf_gap||0);
+  var cells=[
+    {l:'SF zone retention',v:sfRet>2?'Peak forming':sfRet>0.5?'Moderate peak':'Broad/flat',s:(m.sf_retention_min!=null&&m.sf_retention_max!=null)?(m.sf_retention_min+'\u2013'+m.sf_retention_max+' dB range'):(sfRet+' dB')},
+    {l:'SF consistency',v:sfGap<0?'Gamaka-driven':sfGap<2?'Excellent':sfGap<5?'Good':'Variable',s:'gap '+sfGap+' dB'},
+    {l:'Vocal clarity',v:parseFloat(m.hnr)>=15?'Good':parseFloat(m.hnr)>=8?'Fair':'Developing',s:'HNR '+m.hnr+' dB'}
+  ];
   return cells.map(function(c){return '<div class="mcell"><div class="mlbl">'+c.l+'</div><div class="mval">'+c.v+'</div>'+(c.s?'<div class="msub">'+c.s+'</div>':'')+'</div>';}).join('');
 }
 
