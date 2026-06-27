@@ -92,6 +92,12 @@ body{background:var(--bg);color:var(--tx);font-family:var(--ff);font-size:15px;l
 .bgmgrid .mval{font-size:.78rem;font-weight:500;color:var(--tx-s)}
 .bgmgrid .msub{font-size:.62rem}
 .bgnote{font-size:.66rem;color:var(--tx-m);margin-top:6px;line-height:1.4;font-style:italic}
+.mixnote{background:var(--amb-bg);border:1px solid var(--amb-b);border-radius:10px;padding:.7rem .9rem;margin-bottom:1rem;font-size:.75rem;line-height:1.45;color:var(--tx-s)}
+.fbwarn{background:var(--amb-bg);border:1.5px solid var(--amb);border-radius:10px;padding:.8rem 1rem;margin-bottom:1.1rem;font-size:.78rem;line-height:1.5;color:var(--tx-s)}
+.fbwarn b{color:var(--amb)}
+.mixnote b{color:var(--amb);font-weight:600}
+.mixnote .mixgroups{display:flex;gap:14px;margin-top:6px;font-size:.7rem;color:var(--tx-m)}
+.mixnote .mixgroups span{color:var(--tx-s)}
 .mcell{background:var(--bg-s);border:1px solid var(--brd);border-radius:10px;padding:.625rem .875rem}
 .mlbl{font-size:.65rem;font-weight:500;color:var(--tx-m);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
 .mval{font-size:.88rem;font-weight:600;color:var(--tx)}
@@ -190,7 +196,9 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:1rem 0}
       <div style="font-size:.78rem;color:var(--tx-m);margin-top:3px" id="g-rct">context &middot; file &middot; 0s</div>
     </div>
   </div>
+  <div class="fbwarn" id="g-fbwarn" style="display:none"></div>
   <div class="mgrid" id="g-mgrid"></div>
+  <div id="g-mixnote"></div>
   <details class="bgpanel" id="g-bgpanel">
     <summary>More detail (background metrics)</summary>
     <div class="mgrid bgmgrid" id="g-bggrid" style="margin-top:8px"></div>
@@ -288,7 +296,7 @@ G('g-newbtn').addEventListener('click',resetApp);
 async function runAnalysis(){
   if(ST.busy||!ST.file||!ST.mode||!ST.ctx)return;
   ST.busy=true;setWave(true);setBtn('Analysing\u2026',true);hideE('g-anerr');
-  var metrics,src;
+  var metrics,src,fallbackReason=null;
   try{
     // Step 1: Acoustic analysis via Python backend
     // 120s timeout — librosa analysis on 90s audio takes ~20-30s on server
@@ -298,11 +306,20 @@ async function runAnalysis(){
       var t1=setTimeout(function(){ac1.abort();},120000);
       var r=await fetch('/api/analyse',{method:'POST',body:fd,signal:ac1.signal});
       clearTimeout(t1);
-      if(!r.ok)throw new Error('HTTP '+r.status);
+      if(!r.ok){
+        var ed=await r.json().catch(function(){return{};});
+        throw new Error(ed.detail?('HTTP '+r.status+': '+ed.detail):('HTTP '+r.status));
+      }
       var d=await r.json();if(!d.ok)throw new Error('backend error');
       metrics=d.metrics;src='python';
     }catch(be){
-      console.warn('Backend unavailable, using browser analysis:',be.message);
+      // Keep the real reason, not just a console log -- this is shown
+      // prominently in the UI now (see showResult) instead of being
+      // silently swallowed, since a silent fallback to the much simpler
+      // browser-side approximation previously looked like a totally
+      // different, broken result with no explanation of why.
+      fallbackReason=(be&&be.name==='AbortError')?'request timed out after 120s':(be&&be.message)?be.message:'unknown error';
+      console.warn('Backend unavailable, using browser analysis:',fallbackReason);
       var ab=await ST.file.arrayBuffer();
       var ac=new(window.AudioContext||window.webkitAudioContext)();
       var buf=await ac.decodeAudioData(ab);
@@ -320,7 +337,7 @@ async function runAnalysis(){
       throw new Error(ne.detail||'Narrative error '+nr.status);
     }
     var nd=await nr.json();
-    showResult(metrics,nd.text||'Assessment unavailable.',src,ctxL);
+    showResult(metrics,nd.text||'Assessment unavailable.',src,ctxL,fallbackReason);
   }catch(e){
     showE('g-anerr',e.message||'Something went wrong. Please try again.');
     setWave(false);setBtn('Analyse voice',false);
@@ -423,7 +440,7 @@ function buildPrompt(m,ctx){
   return L.join('\n');
 }
 
-function showResult(m,assess,src,ctxL){
+function showResult(m,assess,src,ctxL,fallbackReason){
   setWave(false);
   ['g-hdr','g-mode','g-ctx','g-upsec','g-ancard'].forEach(hide);
   G('g-rav').textContent=m.mode==='singer'?'\u266a':'\u25ce';
@@ -431,8 +448,23 @@ function showResult(m,assess,src,ctxL){
   var sigType=m.signal_type||'melody';
   var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like pitch':'Melodic';
   G('g-rct').textContent=(ctxL?ctxL.label:'')+' \u00b7 '+(ST.file?ST.file.name:'')+' \u00b7 '+m.duration+'s \u00b7 '+sigLbl;
+  // Fallback warning goes right under the header, prominently, not buried
+  // in small grey text at the bottom of the card -- a silent fallback to
+  // the much simpler browser-side approximation previously looked like a
+  // totally different, confusing result with no visible explanation.
+  var fb=G('g-fbwarn');
+  if(src!=='python'){
+    fb.innerHTML='<b>\u26a0 Backend unavailable \u2014 showing an approximate browser-side analysis, not the full precision pipeline.</b> '
+      +'Signal-type detection, ranges/averages across the track, and several other metrics are not available in this mode. '
+      +(fallbackReason?('Reason: '+fbReasonText(fallbackReason)):'')
+      +' Try again in a moment, or check your connection.';
+    show('g-fbwarn');
+  } else {
+    hide('g-fbwarn');
+  }
   G('g-assess').textContent=assess;
   G('g-mgrid').innerHTML=buildPrimaryGrid(m);
+  G('g-mixnote').innerHTML=renderMixNote(m);
   G('g-bggrid').innerHTML=buildBackgroundGrid(m);
   G('g-bgnote').textContent='These track the singer\'s expressive choices in the moment (how much emphasis varies, how steady the tone is) more than overall voice quality \u2014 useful context, not headline feedback.';
   G('g-slope').innerHTML=renderSlope(m);
@@ -447,6 +479,19 @@ function showResult(m,assess,src,ctxL){
     n.textContent=precisionNote;
   }
   show('g-res');
+}
+
+function fbReasonText(r){
+  if(/timed out/i.test(r))return 'the analysis request timed out (file may be long or server busy).';
+  // HTTP 422 from this backend means the audio file itself caused an
+  // exception during analysis (not a bad request) -- the detail after
+  // the colon is the actual Python error and is the useful part to show,
+  // since "HTTP 422" alone gives no clue what to fix.
+  if(/HTTP 422:/.test(r))return 'the server could not analyse this audio file \u2014 '+r.replace(/^HTTP 422:\s*/,'').replace(/^Could not analyse audio:\s*/,'')+'.';
+  if(/HTTP 5\d\d/.test(r))return 'the server returned an error ('+r+').';
+  if(/HTTP 4\d\d/.test(r))return 'the request was rejected ('+r+').';
+  if(/backend error/i.test(r))return 'the server responded but reported an internal error.';
+  return r+'.';
 }
 
 function buildPrimaryGrid(m){
@@ -490,6 +535,22 @@ function buildBackgroundGrid(m){
   ];
   return cells.map(function(c){return '<div class="mcell"><div class="mlbl">'+c.l+'</div><div class="mval">'+c.v+'</div>'+(c.s?'<div class="msub">'+c.s+'</div>':'')+'</div>';}).join('');
 }
+
+function renderMixNote(m){
+  var mix=m.sf_str_mixed;
+  if(!mix||!mix.mixed||!mix.groups) return '';
+  var lo=mix.groups[0], hi=mix.groups[1];
+  // Format timestamps as m:ss for readability
+  function fmtT(arr){return arr.map(function(t){var mn=Math.floor(t/60),s=Math.round(t%60);return mn+':'+(s<10?'0':'')+s;}).join(', ');}
+  function sgn(v){return v>=0?'+'+v:String(v);}
+  return '<div class="mixnote">'
+    +'<b>This segment looks like two different things blended together, not one steady reading.</b> '
+    +'The SF zone strength splits cleanly into a weaker group ('+lo.n+' window'+(lo.n>1?'s':'')+', averaging '+sgn(lo.mean)+' '+mix.unit+') and a stronger group ('+hi.n+' window'+(hi.n>1?'s':'')+', averaging '+sgn(hi.mean)+' '+mix.unit+') \u2014 there\u2019s a clear gap between them rather than a smooth spread. '
+    +'This usually means the recording contains two distinct moments \u2014 for example, sustained passages alongside a brief drop to a different register or intensity \u2014 averaged into a single segment. The headline "SF zone" figure above blends both, so it understates the strong moments and overstates the weak ones.'
+    +'<div class="mixgroups"><span>Weaker around: '+fmtT(lo.times)+'</span><span>Stronger around: '+fmtT(hi.times)+'</span></div>'
+    +'</div>';
+}
+
 
 function sPos(v){return v<-13?18:v<-10?34:v<-6?52:v<-3?70:86;}
 function sLbl(v){return v<-13?'Warm & dark':v<-10?'Warm & settled':v<-6?'Ideal balanced':v<-3?'Bright & forward':'Very bright';}
