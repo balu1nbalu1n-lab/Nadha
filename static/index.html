@@ -93,6 +93,8 @@ body{background:var(--bg);color:var(--tx);font-family:var(--ff);font-size:15px;l
 .bgmgrid .msub{font-size:.62rem}
 .bgnote{font-size:.66rem;color:var(--tx-m);margin-top:6px;line-height:1.4;font-style:italic}
 .mixnote{background:var(--amb-bg);border:1px solid var(--amb-b);border-radius:10px;padding:.7rem .9rem;margin-bottom:1rem;font-size:.75rem;line-height:1.45;color:var(--tx-s)}
+.fbwarn{background:var(--amb-bg);border:1.5px solid var(--amb);border-radius:10px;padding:.8rem 1rem;margin-bottom:1.1rem;font-size:.78rem;line-height:1.5;color:var(--tx-s)}
+.fbwarn b{color:var(--amb)}
 .mixnote b{color:var(--amb);font-weight:600}
 .mixnote .mixgroups{display:flex;gap:14px;margin-top:6px;font-size:.7rem;color:var(--tx-m)}
 .mixnote .mixgroups span{color:var(--tx-s)}
@@ -194,6 +196,7 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:1rem 0}
       <div style="font-size:.78rem;color:var(--tx-m);margin-top:3px" id="g-rct">context &middot; file &middot; 0s</div>
     </div>
   </div>
+  <div class="fbwarn" id="g-fbwarn" style="display:none"></div>
   <div class="mgrid" id="g-mgrid"></div>
   <div id="g-mixnote"></div>
   <details class="bgpanel" id="g-bgpanel">
@@ -293,7 +296,7 @@ G('g-newbtn').addEventListener('click',resetApp);
 async function runAnalysis(){
   if(ST.busy||!ST.file||!ST.mode||!ST.ctx)return;
   ST.busy=true;setWave(true);setBtn('Analysing\u2026',true);hideE('g-anerr');
-  var metrics,src;
+  var metrics,src,fallbackReason=null;
   try{
     // Step 1: Acoustic analysis via Python backend
     // 120s timeout — librosa analysis on 90s audio takes ~20-30s on server
@@ -307,7 +310,13 @@ async function runAnalysis(){
       var d=await r.json();if(!d.ok)throw new Error('backend error');
       metrics=d.metrics;src='python';
     }catch(be){
-      console.warn('Backend unavailable, using browser analysis:',be.message);
+      // Keep the real reason, not just a console log -- this is shown
+      // prominently in the UI now (see showResult) instead of being
+      // silently swallowed, since a silent fallback to the much simpler
+      // browser-side approximation previously looked like a totally
+      // different, broken result with no explanation of why.
+      fallbackReason=(be&&be.name==='AbortError')?'request timed out after 120s':(be&&be.message)?be.message:'unknown error';
+      console.warn('Backend unavailable, using browser analysis:',fallbackReason);
       var ab=await ST.file.arrayBuffer();
       var ac=new(window.AudioContext||window.webkitAudioContext)();
       var buf=await ac.decodeAudioData(ab);
@@ -325,7 +334,7 @@ async function runAnalysis(){
       throw new Error(ne.detail||'Narrative error '+nr.status);
     }
     var nd=await nr.json();
-    showResult(metrics,nd.text||'Assessment unavailable.',src,ctxL);
+    showResult(metrics,nd.text||'Assessment unavailable.',src,ctxL,fallbackReason);
   }catch(e){
     showE('g-anerr',e.message||'Something went wrong. Please try again.');
     setWave(false);setBtn('Analyse voice',false);
@@ -428,7 +437,7 @@ function buildPrompt(m,ctx){
   return L.join('\n');
 }
 
-function showResult(m,assess,src,ctxL){
+function showResult(m,assess,src,ctxL,fallbackReason){
   setWave(false);
   ['g-hdr','g-mode','g-ctx','g-upsec','g-ancard'].forEach(hide);
   G('g-rav').textContent=m.mode==='singer'?'\u266a':'\u25ce';
@@ -436,6 +445,20 @@ function showResult(m,assess,src,ctxL){
   var sigType=m.signal_type||'melody';
   var sigLbl=sigType==='drone'?'Sustained drone':sigType==='speech'?'Speech-like pitch':'Melodic';
   G('g-rct').textContent=(ctxL?ctxL.label:'')+' \u00b7 '+(ST.file?ST.file.name:'')+' \u00b7 '+m.duration+'s \u00b7 '+sigLbl;
+  // Fallback warning goes right under the header, prominently, not buried
+  // in small grey text at the bottom of the card -- a silent fallback to
+  // the much simpler browser-side approximation previously looked like a
+  // totally different, confusing result with no visible explanation.
+  var fb=G('g-fbwarn');
+  if(src!=='python'){
+    fb.innerHTML='<b>\u26a0 Backend unavailable \u2014 showing an approximate browser-side analysis, not the full precision pipeline.</b> '
+      +'Signal-type detection, ranges/averages across the track, and several other metrics are not available in this mode. '
+      +(fallbackReason?('Reason: '+fbReasonText(fallbackReason)):'')
+      +' Try again in a moment, or check your connection.';
+    show('g-fbwarn');
+  } else {
+    hide('g-fbwarn');
+  }
   G('g-assess').textContent=assess;
   G('g-mgrid').innerHTML=buildPrimaryGrid(m);
   G('g-mixnote').innerHTML=renderMixNote(m);
@@ -453,6 +476,14 @@ function showResult(m,assess,src,ctxL){
     n.textContent=precisionNote;
   }
   show('g-res');
+}
+
+function fbReasonText(r){
+  if(/timed out/i.test(r))return 'the analysis request timed out (file may be long or server busy).';
+  if(/HTTP 5\d\d/.test(r))return 'the server returned an error ('+r+').';
+  if(/HTTP 4\d\d/.test(r))return 'the request was rejected ('+r+').';
+  if(/backend error/i.test(r))return 'the server responded but reported an internal error.';
+  return r+'.';
 }
 
 function buildPrimaryGrid(m){
