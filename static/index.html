@@ -546,7 +546,7 @@ function renderMixNote(m){
   return '<div class="mixnote">'
     +'<b>This segment looks like two different things blended together, not one steady reading.</b> '
     +'The SF zone strength splits cleanly into a weaker group ('+lo.n+' window'+(lo.n>1?'s':'')+', averaging '+sgn(lo.mean)+' '+mix.unit+') and a stronger group ('+hi.n+' window'+(hi.n>1?'s':'')+', averaging '+sgn(hi.mean)+' '+mix.unit+') \u2014 there\u2019s a clear gap between them rather than a smooth spread. '
-    +'This usually means the recording contains two distinct moments \u2014 for example, sustained passages alongside a brief drop to a different register or intensity \u2014 averaged into a single segment. The headline "SF zone" figure above blends both, so it understates the strong moments and overstates the weak ones.'
+    +'This usually means the recording contains two distinct kinds of moments \u2014 some combination of register, resonance shaping, or intensity \u2014 averaged into a single segment, rather than one steadily-varying performance. The headline "SF zone" figure above blends both, so it understates the strong moments and overstates the weak ones.'
     +'<div class="mixgroups"><span>Weaker around: '+fmtT(lo.times)+'</span><span>Stronger around: '+fmtT(hi.times)+'</span></div>'
     +'</div>';
 }
