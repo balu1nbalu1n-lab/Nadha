@@ -513,6 +513,7 @@ function renderMixNote(m){
 }
 
 
+function sPos(v){return v<-13?18:v<-10?34:v<-6?52:v<-3?70:86;}
 function sLbl(v){return v<-13?'Warm & dark':v<-10?'Warm & settled':v<-6?'Ideal balanced':v<-3?'Bright & forward':'Very bright';}
 function sTier(v){return(v>=-10&&v<=-6)?'bs':v>-12?'bg':'bd';}
 
