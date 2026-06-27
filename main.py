@@ -109,64 +109,6 @@ def classify_signal_type(y, sr):
     }
 
 
-def detect_mixed_content(values, times, unit="dB"):
-    """
-    A wide min-max range across sampled windows can mean two different
-    things: (a) one continuous, genuinely variable performance (e.g. a
-    singer who gradually builds intensity), or (b) two distinct vocal
-    behaviours got pooled into the same segment -- e.g. sustained
-    higher-register singing interrupted by improvisational drops back to
-    lower notes, which is common in real concert recordings (confirmed by
-    ear on a real Carnatic recording where a segment's "weak SF zone"
-    reading turned out to be a strong high-register passage diluted by
-    lower-note fallback windows averaged into the same statistic).
-
-    A single mean/range cannot distinguish these two cases -- they can
-    produce an identical mean and an identical spread. This needs the
-    actual per-window values: if there's a single dominant gap that splits
-    the windows into two well-separated clusters, that's evidence of (b),
-    not (a). With only 3-8 windows this can't be a real clustering
-    algorithm -- it's a largest-gap heuristic, deliberately conservative
-    (requires a big, clean split) so it only fires when the split is
-    obvious enough to act on, not on ordinary noisy variation.
-    """
-    n = len(values)
-    if n < 4:
-        return {"mixed": False, "groups": None}
-    order = sorted(range(n), key=lambda i: values[i])
-    sv = [values[i] for i in order]
-    st = [times[i] for i in order]
-    total_spread = sv[-1] - sv[0]
-    if total_spread < 1e-6:
-        return {"mixed": False, "groups": None}
-    gaps = [sv[i+1] - sv[i] for i in range(n - 1)]
-    gap_idx = int(np.argmax(gaps))
-    biggest_gap = gaps[gap_idx]
-    # The gap must be both a large fraction of the total spread AND
-    # clearly bigger than the runner-up gap, or this is just one noisy
-    # continuum with no real seam in it.
-    other_gaps = gaps[:gap_idx] + gaps[gap_idx+1:]
-    runner_up = max(other_gaps) if other_gaps else 0
-    if biggest_gap < 0.55 * total_spread or biggest_gap < 1.8 * max(runner_up, 1e-6):
-        return {"mixed": False, "groups": None}
-    lo_vals, hi_vals = sv[:gap_idx+1], sv[gap_idx+1:]
-    lo_times, hi_times = sorted(st[:gap_idx+1]), sorted(st[gap_idx+1:])
-    if len(lo_vals) < 1 or len(hi_vals) < 1:
-        return {"mixed": False, "groups": None}
-    return {
-        "mixed": True,
-        "groups": [
-            {"label": "weaker", "n": len(lo_vals), "mean": round(float(np.mean(lo_vals)), 1),
-             "range": [round(min(lo_vals), 1), round(max(lo_vals), 1)],
-             "times": lo_times},
-            {"label": "stronger", "n": len(hi_vals), "mean": round(float(np.mean(hi_vals)), 1),
-             "range": [round(min(hi_vals), 1), round(max(hi_vals), 1)],
-             "times": hi_times},
-        ],
-        "unit": unit,
-    }
-
-
 def analyse(audio_bytes, filename, mode):
     # Import heavy libraries here (lazy load) — keeps startup memory low
     import numpy as np
@@ -326,7 +268,7 @@ def analyse(audio_bytes, filename, mode):
     n_sf_windows = int(np.clip(round(dur / 15), 3, 8))
     win_starts_sf = np.linspace(lead_in, max(lead_in, len(y) - seg_len), n_sf_windows).astype(int)
 
-    range_slopes, range_sf_strs, range_retentions, range_times = [], [], [], []
+    range_slopes, range_sf_strs, range_retentions = [], [], []
     for ws in win_starts_sf:
         seg_y = y[ws:ws + seg_len]
         f0w = librosa.yin(seg_y, fmin=fmin, fmax=900, sr=SR)
@@ -376,7 +318,6 @@ def analyse(audio_bytes, filename, mode):
         range_slopes.append(slope_w)
         range_sf_strs.append(sf_str_w)
         range_retentions.append(retention_w)
-        range_times.append(round(float(ws) / SR, 1))
 
     if range_slopes:
         slope_min, slope_max = round(min(range_slopes), 2), round(max(range_slopes), 2)
@@ -390,12 +331,10 @@ def analyse(audio_bytes, filename, mode):
         # actually leans toward, so a headline number near one edge of the
         # range can be flagged as atypical rather than representative.
         retention_mean = round(float(np.mean(range_retentions)), 2)
-        sf_str_mix = detect_mixed_content(range_sf_strs, range_times, unit="dB")
     else:
         slope_min = slope_max = slope_mean = slope
         sf_str_min = sf_str_max = sf_str_mean = sf_str
         retention_min = retention_max = retention_mean = sf_retention
-        sf_str_mix = {"mixed": False, "groups": None}
     n_sf_windows_used = len(range_slopes)
 
     # Known limitation: the retention trend-fit assumes a smooth, continuous
@@ -538,9 +477,6 @@ def analyse(audio_bytes, filename, mode):
         "sf_str_min": sf_str_min, "sf_str_max": sf_str_max, "sf_str_mean": sf_str_mean,
         "sf_retention_min": retention_min, "sf_retention_max": retention_max, "sf_retention_mean": retention_mean,
         "n_sf_windows": n_sf_windows_used,
-        "sf_str_windows": [round(v, 1) for v in range_sf_strs],
-        "sf_str_window_times": range_times,
-        "sf_str_mixed": sf_str_mix,
         "sf_slope_local": sf_zone_trend,      # legacy alias
         "sf_slope_deviation": -sf_retention,  # legacy alias (old sign convention)
         "sf_shape": sf_shape, "sf_shape_code": sf_code, "sf_shape_reliable": sf_shape_reliable,
