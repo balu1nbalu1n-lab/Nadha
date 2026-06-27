@@ -629,7 +629,29 @@ function renderZones(m){
   var sfTipDev=m.mode==='singer'?'The SF zone needs deliberate development. Humming mmm opening slowly to may is the most direct route to forward resonance placement.':'The SF zone needs deliberate development. Humming mmm opening slowly to may, or lip trill exercises, are the most direct route to forward resonance placement.';
   var sfDarker=m.mode==='singer'?'Slow the gamaka rate while maintaining full extent \u2014 let each arc breathe.':'Slow the speaking rate and allow the resonance to settle fully into each phrase.';
   var sfBrighter=m.mode==='singer'?'Increase gamaka rate while keeping width, or use brighter vowels on upper swaras.':'Increase breath pressure and bring placement forward \u2014 lip trill exercises directly develop this zone.';
-  z+=zRow('Presence zone (SF)','2500\u20133500 Hz',st,Math.max(5,Math.min(95,(sfM+2)*4.5)),'var(--c-sf)',st==='exceptional'||st==='strong'?sfTipStrong:st==='present'?sfTipPresent:sfTipDev,shT,shLbl,gapNote,sfDarker,sfBrighter);
+  var mix=m.sf_str_mixed;
+  function fmtT(arr){return arr.map(function(t){var mn=Math.floor(t/60),s=Math.round(t%60);return mn+':'+(s<10?'0':'')+s;}).join(', ');}
+  if(mix&&mix.mixed&&mix.groups){
+    // Two distinct resonance behaviours were detected in this recording
+    // (see the callout above the metric grid) -- showing one blended
+    // average here would hide exactly the thing that callout just
+    // explained. Render each group as its own row instead, using that
+    // group's own mean to drive its own tier, bar fill and copy, so the
+    // strong moments aren't dragged down by the weak ones or vice versa.
+    var grpLo=mix.groups[0], grpHi=mix.groups[1];
+    function sgn(v){return v>=0?'+'+v:String(v);}
+    var stHi=csf(grpHi.mean), stLo=csf(grpLo.mean);
+    var tipHi=(stHi==='exceptional'||stHi==='strong')?sfTipStrong:stHi==='present'?sfTipPresent:sfTipDev;
+    var tipLo=(stLo==='exceptional'||stLo==='strong')?sfTipStrong:stLo==='present'?sfTipPresent:sfTipDev;
+    z+=zRow('Presence zone (SF) \u2014 stronger moments','2500\u20133500 Hz \u00b7 around '+fmtT(grpHi.times),stHi,Math.max(5,Math.min(95,(grpHi.mean+2)*4.5)),'var(--c-sf)',
+      tipHi+' This reflects only the '+grpHi.n+' window'+(grpHi.n>1?'s':'')+' where this zone activated strongly (averaging '+sgn(grpHi.mean)+' dB).',
+      null,null,null,sfDarker,sfBrighter);
+    z+=zRow('Presence zone (SF) \u2014 weaker moments','2500\u20133500 Hz \u00b7 around '+fmtT(grpLo.times),stLo,Math.max(5,Math.min(95,(grpLo.mean+2)*4.5)),'var(--c-sf)',
+      tipLo+' This reflects only the '+grpLo.n+' window'+(grpLo.n>1?'s':'')+' where this zone was weak or absent (averaging '+sgn(grpLo.mean)+' dB) \u2014 likely a different register, resonance shaping, or intensity than the stronger moments above, not a flaw to fix in isolation.',
+      null,null,null,sfDarker,sfBrighter);
+  } else {
+    z+=zRow('Presence zone (SF)','2500\u20133500 Hz',st,Math.max(5,Math.min(95,(sfM+2)*4.5)),'var(--c-sf)',st==='exceptional'||st==='strong'?sfTipStrong:st==='present'?sfTipPresent:sfTipDev,shT,shLbl,gapNote,sfDarker,sfBrighter);
+  }
   var ut=cz(up);
   z+=zRow('Upper register','3500\u20138000 Hz',ut,Math.max(3,Math.min(95,(up+18)*3.5)),'var(--c-up)',ut==='strong'||ut==='good'?'Upper register is bright and present \u2014 consonants are crisp and the voice has natural sparkle that sustains listener alertness.':'Upper register is developing. Open vowels on upper pitches with a completely open throat will progressively develop this zone.',null,null,null,'Allow the upper register to recede naturally in deepest passages.','Bright vowels ee and ay or fast tongue-tip articulation will open this zone progressively.');
   if(m.signal_type==='drone'){
