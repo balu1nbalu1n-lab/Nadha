@@ -129,6 +129,16 @@ def detect_mixed_content(values, times, unit="dB"):
     algorithm -- it's a largest-gap heuristic, deliberately conservative
     (requires a big, clean split) so it only fires when the split is
     obvious enough to act on, not on ordinary noisy variation.
+
+    Threshold note: an earlier version compared the gap to the *total*
+    spread, which under-fired on a real Behag recording (Part 3) -- a
+    visually obvious 4-vs-4 split (weak cluster -6.4 to 3.6, strong
+    cluster 20.6 to 33.8, separated by a 17 dB gap) failed a "gap >= 55%
+    of total spread" test because each cluster also had its own internal
+    spread, inflating the total. Comparing the gap to the spread *within*
+    each resulting cluster instead (gap must clearly exceed how spread-out
+    either side is on its own) catches this correctly while still
+    rejecting a smoothly increasing sequence with no real seam.
     """
     import numpy as np
     n = len(values)
@@ -143,14 +153,22 @@ def detect_mixed_content(values, times, unit="dB"):
     gaps = [sv[i+1] - sv[i] for i in range(n - 1)]
     gap_idx = int(np.argmax(gaps))
     biggest_gap = gaps[gap_idx]
-    # The gap must be both a large fraction of the total spread AND
-    # clearly bigger than the runner-up gap, or this is just one noisy
-    # continuum with no real seam in it.
     other_gaps = gaps[:gap_idx] + gaps[gap_idx+1:]
     runner_up = max(other_gaps) if other_gaps else 0
-    if biggest_gap < 0.55 * total_spread or biggest_gap < 1.8 * max(runner_up, 1e-6):
-        return {"mixed": False, "groups": None}
     lo_vals, hi_vals = sv[:gap_idx+1], sv[gap_idx+1:]
+    if len(lo_vals) < 2 or len(hi_vals) < 2:
+        # One side is a single point -- only call it mixed if that point is
+        # an extreme, unambiguous outlier (gap far exceeds every other gap).
+        if biggest_gap < 3.0 * max(runner_up, 1e-6):
+            return {"mixed": False, "groups": None}
+    else:
+        lo_spread = max(lo_vals) - min(lo_vals)
+        hi_spread = max(hi_vals) - min(hi_vals)
+        within_max = max(lo_spread, hi_spread, 1e-6)
+        # The separating gap must clearly exceed the spread within either
+        # resulting group, and still be the standout gap in the sequence.
+        if biggest_gap < 1.25 * within_max or biggest_gap < 1.8 * max(runner_up, 1e-6):
+            return {"mixed": False, "groups": None}
     lo_times, hi_times = sorted(st[:gap_idx+1]), sorted(st[gap_idx+1:])
     if len(lo_vals) < 1 or len(hi_vals) < 1:
         return {"mixed": False, "groups": None}
