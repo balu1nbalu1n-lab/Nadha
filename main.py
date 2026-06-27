@@ -130,6 +130,7 @@ def detect_mixed_content(values, times, unit="dB"):
     (requires a big, clean split) so it only fires when the split is
     obvious enough to act on, not on ordinary noisy variation.
     """
+    import numpy as np
     n = len(values)
     if n < 4:
         return {"mixed": False, "groups": None}
