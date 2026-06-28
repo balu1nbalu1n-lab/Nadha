@@ -295,6 +295,26 @@ def analyse(audio_bytes, filename, mode):
     h_strong = sum(1 for h in harmonics if h["db"] > -30)
     h_good   = sum(1 for h in harmonics if h["db"] > -45)
 
+    # Compact LTAS curve + the actual harmonic-peak fit line, for the
+    # "Spectral regions of interest" panel's slope chart -- the chart
+    # must reflect the SAME basis as the reported slope number, which is
+    # fit on discrete harmonic peaks (hf/ha above), not a freeform fit on
+    # the raw curve. Sending both means the frontend draws the real
+    # curve behind the real fitted line, not two inconsistent things.
+    ltas_mask = (freqs >= 60) & (freqs <= 8000)
+    ltas_freqs_full = freqs[ltas_mask]
+    ltas_db_full = avg_db[ltas_mask]
+    # Log-spaced downsample to ~120 points -- a smooth envelope doesn't
+    # need FFT-bin resolution, and this keeps the payload small.
+    n_pts = min(120, len(ltas_freqs_full))
+    log_targets = np.logspace(np.log10(60), np.log10(8000), n_pts)
+    ltas_idx = np.searchsorted(ltas_freqs_full, log_targets)
+    ltas_idx = np.clip(ltas_idx, 0, len(ltas_freqs_full)-1)
+    ltas_idx = sorted(set(ltas_idx.tolist()))
+    ltas_curve = [[round(float(ltas_freqs_full[i]),1), round(float(ltas_db_full[i]),1)] for i in ltas_idx]
+    harmonic_fit_points = [[h["hz"], h["db"]] for h in harmonics]
+    fit_line_db = [round(float(np.polyval(fit, np.log2(60))),1), round(float(np.polyval(fit, np.log2(8000))),1)] if len(hf) >= 3 else None
+
     ref = (freqs >= 400) & (freqs <= 1500)
     cr = np.polyfit(np.log2(freqs[ref]), avg_db[ref], 1)
     sf_mask  = (freqs >= SF_LOW) & (freqs <= SF_HIGH)
@@ -550,6 +570,9 @@ def analyse(audio_bytes, filename, mode):
         "n_harmonics": len(harmonics), "h_strong": h_strong, "h_good": h_good,
         "dominant_H": dom_h["H"], "dominant_hz": round(dom_h["hz"],1),
         "slope": slope,
+        "ltas_curve": ltas_curve,
+        "harmonic_fit_points": harmonic_fit_points,
+        "fit_line_endpoints_db": fit_line_db,
         "sf_str": sf_str, "sf_hz": sf_hz, "sf_ltas": sf_ltas, "sf_gap": sf_gap,
         "sf_zone_trend": sf_zone_trend,
         "sf_retention": sf_retention,
