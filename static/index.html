@@ -76,9 +76,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--ff);font-size:16px;l
 .ztip.act{color:#fde68a;border-left:2px solid var(--amb-b)}
 .shcard{background:var(--bg-s);border:1px solid var(--brd);border-radius:8px;padding:.6rem .875rem;margin-top:7px}
 .gnote{font-size:.75rem;color:var(--tx-m);margin-top:5px;padding-left:10px;border-left:2px solid var(--brd);font-style:italic;line-height:1.5}
-.dtog{font-size:.68rem;color:var(--tx-m);background:none;border:none;cursor:pointer;padding:0 3px}
-.dbox{display:none;margin-top:6px;padding-left:10px}
-.dbox.open{display:block}
+.dbox{margin-top:6px;padding-left:10px;border-left:2px solid var(--brd-m)}
 .dln{font-size:.75rem;color:var(--tx-s);line-height:1.55;margin-bottom:4px}
 .assess{font-family:var(--ff);font-size:1.2rem;line-height:1.85;color:var(--tx-s);font-style:normal}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:1rem}
@@ -231,7 +229,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:1rem 0}
     <div id="g-slope" style="margin-bottom:1.25rem"></div>
     <hr class="div">
     <div id="g-zones"></div>
-    <p style="font-size:.68rem;color:var(--tx-m);text-align:center;margin-top:8px">Tap &#9662; on any zone for directional suggestions</p>
   </div>
   <p class="notice" id="g-srcnote"></p>
   <p style="font-size:.7rem;color:var(--tx-m);text-align:center;margin-top:.75rem;line-height:1.5">
@@ -582,7 +579,6 @@ function renderSlope(m){
     +'</div>';
 }
 
-var _zi=0;
 function bdg(t,l){var cm={strong:'bs',good:'bg',developing:'bd',needs:'bn',exceptional:'bs',present:'bd',wide:'bs',expressive:'bg',moderate:'bd',minimal:'bn',flat:'bn'};var dl={strong:'Strong',good:'Good',developing:'Developing',needs:'Needs attention',exceptional:'Exceptional',present:'Developing',wide:'Wide Carnatic',expressive:'Expressive',moderate:'Moderate',minimal:'Minimal',flat:'Flat'};return '<span class="bdg '+(cm[t]||'bd')+'">'+(l||dl[t]||t)+'</span>';}
 function cz(v){v=parseFloat(v);return v>=18?'strong':v>=10?'good':v>=4?'developing':'needs';}
 function csf(v){v=parseFloat(v);return v>=18?'exceptional':v>=12?'strong':v>=6?'present':'developing';}
@@ -590,19 +586,17 @@ function cgk(v){v=parseFloat(v);return v>=5?'wide':v>=3?'expressive':v>=1.5?'mod
 function cpi(v){v=parseFloat(v);return v>=80?'strong':v>=40?'good':'developing';}
 
 function zRow(name,freq,tier,pct,color,tip,shT,shLbl,gapNote,darker,brighter){
-  var id='zd'+(++_zi);
   var dt=tier==='needs'?'developing':tier==='exceptional'?'strong':tier==='present'?'developing':tier;
   var tc=(dt==='developing'||dt==='needs')?'act':'ok';
   var shBlock=shT?('<div class="shcard"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:.7rem;color:var(--tx-m)">SF zone shape</span>'+bdg(shT,shLbl)+'</div><div class="btrack"><div class="bfill" style="width:'+(shT==='strong'?90:shT==='good'?62:35)+'%;background:'+(shT==='strong'?'var(--grn)':shT==='good'?'var(--blu)':'var(--amb)')+'"></div></div><p style="font-size:.7rem;color:var(--tx-m);margin-top:4px;line-height:1.4">Broad plateau \u2192 Moderate peak \u2192 Sharp peak \u00b7 Sharp = focused therapeutic resonance</p></div>'):'';
   var gnBlock=gapNote?'<p class="gnote">'+gapNote+'</p>':'';
-  return '<div class="zone"><div class="zhdr"><span class="zname">'+name+'</span><span class="zfreq">'+freq+'</span>'+bdg(dt)+((darker||brighter)?'<button class="dtog" onclick="(function(){var e=document.getElementById(\''+id+'\');if(e)e.classList.toggle(\'open\')})()">&#9662;</button>':'')+'</div>'
+  return '<div class="zone"><div class="zhdr"><span class="zname">'+name+'</span><span class="zfreq">'+freq+'</span>'+bdg(dt)+'</div>'
     +'<div class="btrack"><div class="bfill" style="width:'+Math.max(3,Math.min(95,pct))+'%;background:'+color+'"></div></div>'
     +(tip?'<p class="ztip '+tc+'">'+tip+'</p>':'')+gnBlock+shBlock
-    +'<div class="dbox" id="'+id+'">'+(darker?'<p class="dln"><span style="font-weight:600;color:var(--blu)">To lean darker: </span>'+darker+'</p>':'')+(brighter?'<p class="dln"><span style="font-weight:600;color:var(--amb)">To lean brighter: </span>'+brighter+'</p>':'')+'</div></div>';
+    +((darker||brighter)?('<div class="dbox">'+(darker?'<p class="dln"><span style="font-weight:600;color:var(--blu)">To lean darker: </span>'+darker+'</p>':'')+(brighter?'<p class="dln"><span style="font-weight:600;color:var(--amb)">To lean brighter: </span>'+brighter+'</p>':'')+'</div>'):'')+'</div>';
 }
 
 function renderZones(m){
-  _zi=0;
   var sfS=parseFloat(m.sf_str||0),sfGap=parseFloat(m.sf_gap||0),lo=parseFloat(m.low_max||0),mi=parseFloat(m.mid_max||0),sfM=parseFloat(m.sf_max||sfS*.9),up=parseFloat(m.upper_max||0),pi=parseFloat(m.pitch_iqr||30);
   var gkHasRange=m.gamaka_min!=null && m.gamaka_max!=null;
   var gk=gkHasRange?parseFloat(m.gamaka_max):parseFloat(m.gamaka||0);
