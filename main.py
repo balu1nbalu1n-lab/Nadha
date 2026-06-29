@@ -588,7 +588,17 @@ def analyse(audio_bytes, filename, mode):
         "sf_shape": sf_shape, "sf_shape_code": sf_code, "sf_shape_reliable": sf_shape_reliable,
         "low_max":   zone(80,   500,  200, 800),
         "mid_max":   zone(500,  2500, 400, 1500),
-        "sf_max":    zone(2500, 3500, 500, 1500),
+        # sf_max previously called zone(2500,3500,...) on the FULL-TRACK
+        # average spectrum (adb_full) -- a different signal from sf_str
+        # (the headline SF metric, computed on the single steadiest
+        # window). On every real recording tested, these disagreed,
+        # sometimes by 30+ dB (e.g. one file: sf_str=34.7 "Strong" while
+        # the old sf_max=4.5 "Developing") -- the headline card and the
+        # "Spectral regions of interest" panel were measuring genuinely
+        # different things while both claiming to describe "the SF zone".
+        # Reusing sf_str here makes the panel agree with the headline by
+        # construction, since they're now the same number.
+        "sf_max":    sf_str,
         "upper_max": zone(3500, 8000, 800, 2500),
         "hnr": hnr, "vfrac": round(vfrac,3),
         "gamaka": round(extent_st,2), "gamaka_rate": round(vib_rate,2),
