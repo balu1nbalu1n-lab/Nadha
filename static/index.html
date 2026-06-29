@@ -228,7 +228,6 @@ hr.div{border:none;border-top:1px solid var(--brd);margin:1rem 0}
   <div class="card"><div class="sec">Assessment</div><p class="assess" id="g-assess"></p></div>
   <div class="card">
     <div class="sec">Spectral regions of interest</div>
-    <div id="g-ltas" style="margin-bottom:1.25rem"></div>
     <div id="g-slope" style="margin-bottom:1.25rem"></div>
     <hr class="div">
     <div id="g-zones"></div>
@@ -463,7 +462,6 @@ function showResult(m,assess,src,fallbackReason){
   G('g-mixnote').innerHTML=renderMixNote(m);
   G('g-bggrid').innerHTML=buildBackgroundGrid(m);
   G('g-bgnote').textContent='These track the singer\'s expressive choices in the moment (how much emphasis varies, how steady the tone is) more than overall voice quality \u2014 useful context, not headline feedback.';
-  G('g-ltas').innerHTML=renderLTAS(m);
   G('g-slope').innerHTML=renderSlope(m);
   G('g-zones').innerHTML=renderZones(m);
   var n=G('g-srcnote');
@@ -552,46 +550,6 @@ function renderMixNote(m){
 function sPos(v){return v<-13?18:v<-10?34:v<-6?52:v<-3?70:86;}
 function sLbl(v){return v<-13?'Warm & dark':v<-10?'Warm & settled':v<-6?'Ideal balanced':v<-3?'Bright & forward':'Very bright';}
 function sTier(v){return(v>=-10&&v<=-6)?'bs':v>-12?'bg':'bd';}
-
-function renderLTAS(m){
-  var curve=m.ltas_curve, fitPts=m.fit_line_endpoints_db;
-  if(!curve||!curve.length) return '';
-  // Log-frequency x-axis from 60Hz-8kHz, matching the analysis window;
-  // y-axis auto-ranges to the curve's own min/max with a small margin so
-  // the shape reads clearly regardless of how loud/quiet the recording is.
-  var W=640,H=220,padL=38,padR=14,padT=10,padB=26;
-  var plotW=W-padL-padR, plotH=H-padT-padB;
-  var fLo=60,fHi=8000;
-  function xOf(f){return padL+plotW*(Math.log10(f)-Math.log10(fLo))/(Math.log10(fHi)-Math.log10(fLo));}
-  var dbVals=curve.map(function(p){return p[1];});
-  var dbMin=Math.min.apply(null,dbVals), dbMax=Math.max.apply(null,dbVals);
-  var dbRange=Math.max(5,dbMax-dbMin);
-  dbMin-=dbRange*0.08; dbMax+=dbRange*0.08;
-  function yOf(db){return padT+plotH*(1-(db-dbMin)/(dbMax-dbMin));}
-  var pathD=curve.map(function(p,i){return (i===0?'M':'L')+xOf(p[0]).toFixed(1)+','+yOf(p[1]).toFixed(1);}).join(' ');
-  var sfX1=xOf(2500), sfX2=xOf(3500);
-  var fitLine='';
-  if(fitPts&&fitPts.length===2){
-    fitLine='<line x1="'+xOf(fLo).toFixed(1)+'" y1="'+yOf(fitPts[0]).toFixed(1)+'" x2="'+xOf(fHi).toFixed(1)+'" y2="'+yOf(fitPts[1]).toFixed(1)+'" stroke="var(--red)" stroke-width="1.3" stroke-dasharray="4,3"/>';
-  }
-  // Gridline + axis labels at musically/acoustically meaningful frequencies
-  var ticks=[100,1000,8000].filter(function(f){return f>=fLo&&f<=fHi;});
-  var tickEls=ticks.map(function(f){
-    var x=xOf(f);
-    return '<line x1="'+x.toFixed(1)+'" y1="'+padT+'" x2="'+x.toFixed(1)+'" y2="'+(padT+plotH)+'" stroke="var(--brd)" stroke-width="0.6"/>'
-      +'<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" font-size="9" fill="var(--tx-m)" text-anchor="middle">'+(f>=1000?(f/1000)+'k':f)+' Hz</text>';
-  }).join('');
-  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px"><span style="font-size:.875rem;font-weight:600;color:var(--tx)">Long-term spectrum (LTAS)</span><span style="font-size:.68rem;color:var(--tx-m)">what the slope number is measured from</span></div>'
-    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block" preserveAspectRatio="xMidYMid meet">'
-    +'<rect x="'+sfX1.toFixed(1)+'" y="'+padT+'" width="'+(sfX2-sfX1).toFixed(1)+'" height="'+plotH+'" fill="var(--grn)" opacity="0.12"/>'
-    +tickEls
-    +'<path d="'+pathD+'" fill="none" stroke="var(--blu)" stroke-width="1.1"/>'
-    +fitLine
-    +'<text x="'+(sfX1+(sfX2-sfX1)/2).toFixed(1)+'" y="'+(padT+12)+'" font-size="8.5" fill="var(--grn)" text-anchor="middle">SF zone</text>'
-    +'</svg>'
-    +'<div style="display:flex;gap:14px;margin-top:4px;font-size:.66rem;color:var(--tx-m)"><span><span style="display:inline-block;width:10px;height:2px;background:var(--blu);vertical-align:middle;margin-right:4px"></span>Spectrum</span><span><span style="display:inline-block;width:10px;height:2px;background:var(--red);vertical-align:middle;margin-right:4px;border-top:1.3px dashed var(--red)"></span>Fitted slope</span><span><span style="display:inline-block;width:10px;height:10px;background:var(--grn);opacity:.4;vertical-align:middle;margin-right:4px"></span>SF zone (2500\u20133500 Hz)</span></div>';
-}
-
 
 function renderSlope(m){
   var sl=parseFloat(m.slope),pos=sPos(sl),lbl=sLbl(sl),tier=sTier(sl);
