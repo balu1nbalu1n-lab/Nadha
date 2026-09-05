@@ -602,26 +602,22 @@ def analyse(audio_bytes, filename, mode):
         "upper_max": zone(3500, 8000, 800, 2500),
 
         # ── INTRA-TRACK SPECTRAL CHARACTER METRICS ────────────────────────
-        # Both computed from adb_full / mag_full so they describe the whole
-        # recording's tonal character rather than a single stable window.
-        # Both are fully self-referential -- no external reference needed --
-        # so they remain meaningful regardless of venue, mic, or gain.
+        # Fully self-referential — no external reference or trend line needed
+        # — so they stay meaningful regardless of venue, mic, or gain.
 
         # Spectral centroid: frequency-weighted centre of energy mass.
-        # Lower = energy concentrated in bass/low-mid (grounding, warm).
-        # Higher = energy concentrated in mid/upper harmonics (activating, bright).
-        # Uses linear magnitude (not dB) so energy weighting is proportional.
+        # Lower = energy in bass/low-mid (grounding, warm, meditative).
+        # Higher = energy in upper harmonics (activating, bright, forward).
+        # Uses linear magnitude so energy weighting is proportional.
         "spectral_centroid": round(float(
             np.sum(freqs * np.mean(mag_full, axis=1)) /
             (np.sum(np.mean(mag_full, axis=1)) + 1e-10)
         ), 0),
 
-        # SF hump ratio: mean energy in SF zone vs mean of its immediate
-        # flanking bands (1500-2500 Hz below, 3500-5000 Hz above).
-        # Positive = real resonance hump rising above neighbours.
-        # Near zero or negative = SF zone is flat or a spike without a hump.
-        # Distinguishes structured formant hump (trained voice) from
-        # incidental harmonic spikes or flat spectral noise.
+        # SF hump ratio: mean energy in SF zone (2500-3500 Hz) minus mean
+        # of its immediate flanking bands (1500-2500 Hz and 3500-5000 Hz).
+        # Positive = real resonance hump rising above neighbours (trained
+        # formant shaping). Near-zero or negative = flat or incidental spike.
         "sf_hump_ratio": round(float(
             np.mean(adb_full[(freqs >= 2500) & (freqs <= 3500)]) -
             np.mean(adb_full[
