@@ -501,10 +501,6 @@ function buildPrimaryGrid(m){
     {l:'Overall slope',v:slL(sl),s:(m.slope_min!=null&&m.slope_max!=null)?(m.slope_min+'\u2013'+m.slope_max+' dB/oct range'):(m.slope+' dB/oct')},
     {l:'SF zone',v:sf>=15?'Strong':sf>=10?'Present':sf>=5?'Emerging':'Developing',s:(m.sf_str_min!=null&&m.sf_str_max!=null)?('+'+m.sf_str_min+' to +'+m.sf_str_max+' dB range'+(m.sf_str_mean!=null?(', avg +'+m.sf_str_mean+' dB'):'')):('+'+sf+' dB')}
   ];
-  // Spectral centroid: frequency-weighted centre of energy mass of the whole
-  // recording. Fully intra-track — no external reference. Lower = energy
-  // concentrated in bass/low-mid (grounding, warm). Higher = energy sits in
-  // the upper harmonics (activating, bright/forward).
   if(m.spectral_centroid!=null){
     var cen=parseFloat(m.spectral_centroid);
     var cenLbl=cen<800?'Deep / grounding':cen<1200?'Warm / settled':cen<1600?'Balanced':cen<2000?'Bright / forward':'Very bright';
@@ -650,19 +646,16 @@ function renderZones(m){
   } else {
     z+=zRow('Presence zone (SF)','2500\u20133500 Hz',st,Math.max(5,Math.min(95,(sfM+2)*4.5)),'var(--c-sf)',st==='exceptional'||st==='strong'?sfTipStrong:st==='present'?sfTipPresent:sfTipDev,shT,shLbl,gapNote,sfDarker,sfBrighter);
   }
-  // SF hump character — sub-note describing the shape of the SF zone
-  // relative to its immediate neighbouring bands (1500-2500 Hz below,
-  // 3500-5000 Hz above). A broad, structured hump rising clearly above
-  // both flanks is the hallmark of a trained adult voice with deliberate
-  // formant shaping. A flat or spike-only pattern suggests either an
-  // incidental harmonic landing in the band or an undeveloped resonance.
   if(m.sf_hump_ratio!=null){
     var hump=parseFloat(m.sf_hump_ratio);
-    var humpDesc=hump>=8?'Broad structured hump \u2014 the SF zone rises clearly above both flanking bands, the hallmark of deliberate, trained formant shaping.':
-                 hump>=4?'Moderate hump \u2014 a real but not fully developed resonance structure. Sustained open-vowel singing on comfortable pitches will deepen it.':
-                 hump>=1?'Gentle shoulder \u2014 the SF zone is slightly elevated but not forming a distinct hump. Forward placement practice will concentrate the resonance.':
-                         'Flat or incidental \u2014 the SF zone energy is not rising above neighbouring bands. The presence reading reflects harmonics passing through rather than active formant shaping.';
-    z+='<div class="zone" style="margin-top:-6px;margin-bottom:1rem"><p class="ztip '+(hump>=4?'ok':'act')+'" style="font-size:.75rem"><strong>SF zone shape:</strong> '+humpDesc+' (hump ratio '+(hump>=0?'+':'')+hump+' dB)</p></div>';
+    var humpDesc=hump>=8?'Broad structured hump \u2014 the SF zone rises clearly above both flanking bands, the hallmark of deliberate, trained formant shaping.'
+      :hump>=4?'Moderate hump \u2014 a real but not fully developed resonance structure. Sustained open-vowel singing on comfortable pitches will deepen it.'
+      :hump>=1?'Gentle shoulder \u2014 the SF zone is slightly elevated but not forming a distinct hump. Forward placement practice will concentrate the resonance.'
+      :'Flat or incidental \u2014 the SF zone energy is not rising above neighbouring bands. The presence reading reflects harmonics passing through rather than active formant shaping.';
+    z+='<div class="zone" style="margin-top:-6px;margin-bottom:1rem">'
+      +'<p class="ztip '+(hump>=4?'ok':'act')+'" style="font-size:.75rem">'
+      +'<strong>SF zone shape:</strong> '+humpDesc
+      +' (hump ratio '+(hump>=0?'+':'')+hump+' dB)</p></div>';
   }
   var ut=cz(up);
   z+=zRow('Upper register','3500\u20138000 Hz',ut,Math.max(3,Math.min(95,(up+18)*3.5)),'var(--c-up)',ut==='strong'||ut==='good'?'Upper register is bright and present \u2014 consonants are crisp and the voice has natural sparkle that sustains listener alertness.':'Upper register is developing. Open vowels on upper pitches with a completely open throat will progressively develop this zone.',null,null,null,'Allow the upper register to recede naturally in deepest passages.','Bright vowels ee and ay or fast tongue-tip articulation will open this zone progressively.');
